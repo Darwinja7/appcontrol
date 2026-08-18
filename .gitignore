@@ -49,3 +49,13 @@ secrets/
 *.pem
 id_rsa
 .google-credentials/
+
+# AppControl secrets
+.env
+.env.local
+.env.production
+.env.development.local
+secrets/
+*.pem
+id_rsa
+.google-credentials/
