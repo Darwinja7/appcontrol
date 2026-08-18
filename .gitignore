@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AppControl secrets
+.env
+.env.local
+.env.production
+.env.development.local
+secrets/
+*.pem
+id_rsa
+.google-credentials/
