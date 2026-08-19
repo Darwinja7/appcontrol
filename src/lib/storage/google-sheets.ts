@@ -221,3 +221,30 @@ export const googleSheetsStorage: StorageAdapter = {
   findRegistroByIdempotencyKey,
   appendRegistro,
 };
+
+export async function readSheetRows(
+  sheetName: string
+): Promise<Record<string, string>[]> {
+  const sheets = getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+
+  await ensureSheetExists(sheets, spreadsheetId, sheetName);
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!A:ZZ`,
+  });
+
+  const values = res.data.values ?? [];
+  if (values.length === 0) return [];
+
+  const [header, ...rows] = values;
+
+  return rows.map((row) => {
+    const obj: Record<string, string> = {};
+    header.forEach((h, i) => {
+      obj[String(h).trim()] = String(row[i] ?? "").trim();
+    });
+    return obj;
+  });
+}

@@ -3,6 +3,7 @@ import { hermesCaptureSchema } from "@/lib/validation";
 import { verifyHermesAccessToken } from "@/lib/hermes-auth";
 import { getStorageAdapter } from "@/lib/storage";
 import { sha256Hex } from "@/lib/crypto";
+import { validarCaptura } from "@/lib/catalogs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,13 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
+
+  const errores = await validarCaptura(data.sender, data.payload);
+
+  if (errores.length > 0) {
+    const mensaje = errores.map((e) => e.mensaje).join("; ");
+    return reject(errores[0].codigo, mensaje, 400);
+  }
 
   const idempotencyHeader = request.headers.get("idempotency-key")?.trim();
   const canonical = JSON.stringify({
