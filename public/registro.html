@@ -1,0 +1,95 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Registro · AppControl</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+label.cell{display:inline-flex;flex-direction:column;gap:3px;align-items:center;cursor:pointer}
+label.cell input{width:auto;accent-color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><b>App</b>Control · Registro</div>
+    <div><a href="/configuracion">Config</a><a href="/dashboard">Dashboard</a><a href="#" id="out">Salir</a></div>
+  </div>
+  <div class="card">
+    <div class="kicker">Formulario de actividades Grid</div>
+    <h2 style="margin:6px 0 14px;font-size:24px">Nivel × Unidad/Zona</h2>
+    <label>Proyecto</label><select id="proyecto"></select>
+    <label>Torre</label><select id="torre"></select>
+    <label>Actividad (solo habilitadas)</label><select id="actividad"></select>
+    <label>Aplicar estado</label><select id="estado"></select>
+    <button class="btn" id="save">Registrar selección</button>
+    <div class="msg" id="m"></div>
+    <div class="gridwrap" id="box" style="margin-top:16px"></div>
+  </div>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+async function api(p, o = {}) { const r = await fetch(p, { headers: { "Content-Type": "application/json" }, ...o }); if (r.status === 401) { location.href = "/login.html"; throw 0; } return r.json(); }
+const ESTADOS = ["Sin empezar", "En replanteo", "En curso", "En remate", "Listo"];
+const VALOR = { "Sin empezar": 0, "En replanteo": 0.1, "En curso": 0.5, "En remate": 0.8, "Listo": 1 };
+let D = null, LAST = new Map();
+const hab = (r) => r.APLICA === "SI" && r.ACTIVO === "SI" && r.CONTRATISTA && r.CONTRATISTA !== "Sin asignar";
+async function init() {
+  D = await api("/api/data");
+  LAST = new Map();
+  for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); }
+  fill($("#proyecto"), D.proyectos, (p) => ({ v: p.CODIGO, t: p.CODIGO }));
+  fill($("#estado"), ESTADOS, (e) => ({ v: e, t: e }));
+  $("#proyecto").onchange = () => { fill($("#torre"), torres(), (t) => ({ v: t, t })); $("#actividad").innerHTML = ""; $("#box").innerHTML = ""; };
+  $("#torre").onchange = () => { fill($("#actividad"), actsHabilitadas(), (a) => ({ v: a, t: a })); $("#box").innerHTML = ""; };
+  $("#actividad").onchange = render;
+  $("#save").onclick = guardar;
+  document.getElementById("out").onclick = async (e) => { e.preventDefault(); await fetch("/api/logout", { method: "POST" }); location.href = "/"; };
+}
+function fill(el, items, map) { el.innerHTML = '<option value="">Seleccione...</option>' + items.map((i) => `<option value="${map(i).v}">${map(i).t}</option>`).join(""); }
+function torres() { return [...new Set(D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value).map((u) => u.TORRE))]; }
+function cfgHab() { return D.configuracion.filter((r) => r.PROYECTO === $("#proyecto").value && r.TORRE === $("#torre").value && hab(r)); }
+function actsHabilitadas() { return [...new Set(cfgHab().map((r) => r.ACTIVIDAD))]; }
+function render() {
+  const a = $("#actividad").value; if (!a) return;
+  const cells = cfgHab().filter((r) => r.ACTIVIDAD === a);
+  const niveles = [...new Set(cells.map((r) => r.NIVEL))].sort((x, y) => +x - +y);
+  const cols = [...new Set(cells.map((r) => r.UNIDAD))].sort();
+  let html = "<table class='grid'><tr><th>NIVEL</th><th>AVANCE</th>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
+  for (const n of niveles) {
+    const vals = [];
+    html += `<tr><td class='lvl'>${n}</td>`;
+    let av = "<td class='av' data-av='1'></td>";
+    const cellVals = [];
+    html = html; // placeholder
+    let tds = "";
+    for (const u of cols) {
+      const c = cells.find((r) => r.NIVEL === n && r.UNIDAD === u);
+      if (!c) { tds += "<td></td>"; continue; }
+      const last = LAST.get(a + "|" + n + "|" + u);
+      const estado = last ? last.ESTADO : "Sin empezar";
+      cellVals.push(VALOR[estado] ?? 0);
+      tds += `<td><label class='cell'><input type='checkbox' data-n='${n}' data-u='${u}'/><span class='chip st${ESTADOS.indexOf(estado)}'>${estado}</span></label></td>`;
+    }
+    const avg = cellVals.length ? Math.round((cellVals.reduce((x, y) => x + y, 0) / cellVals.length) * 100) : 0;
+    html += `<td class='av'>${avg}%</td>` + tds + "</tr>";
+  }
+  html += "</table>";
+  $("#box").innerHTML = html;
+}
+async function guardar() {
+  const a = $("#actividad").value, est = $("#estado").value;
+  const checks = [...$("#box").querySelectorAll("input:checked")];
+  if (!a || !est || !checks.length) { $("#m").textContent = "Selecciona actividad, estado y al menos una unidad."; $("#m").className = "msg err"; return; }
+  const items = checks.map((c) => ({ proyecto: $("#proyecto").value, torre: $("#torre").value, actividad: a, nivel: c.dataset.n, unidad: c.dataset.u, estado: est }));
+  const d = await api("/api/registro-save", { method: "POST", body: JSON.stringify({ items }) });
+  $("#m").textContent = d.success ? `Registrados ${d.registrados} avances (${est}).` : "Error";
+  $("#m").className = "msg " + (d.success ? "ok" : "err");
+  if (d.success) { D = await api("/api/data"); init2(); render(); }
+}
+function init2() { LAST = new Map(); for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); } }
+init();
+</script>
+</body>
+</html>

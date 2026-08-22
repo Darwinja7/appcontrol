@@ -1,0 +1,49 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ingresar · AppControl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;position:relative}
+.login::after{content:"";position:absolute;top:-120px;right:-60px;width:480px;height:480px;background:radial-gradient(circle,rgba(255,176,32,.13),transparent 65%);pointer-events:none}
+.lcard{width:100%;max-width:400px;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:22px;padding:34px;box-shadow:0 40px 90px rgba(0,0,0,.55);position:relative;z-index:2}
+.llogo{display:flex;align-items:center;gap:10px;font-family:"Space Grotesk";font-weight:700;font-size:20px}
+.llogo em{font-style:normal;color:var(--amber)}
+.lcard h1{font-size:28px;margin:18px 0 4px;letter-spacing:-.01em}
+.lsub{color:var(--mut);font-size:14px}
+.stripe{height:8px;background:repeating-linear-gradient(-45deg,var(--amber) 0 12px,transparent 12px 24px);border-radius:99px;margin:22px 0 6px;opacity:.8}
+.back{display:block;text-align:center;margin-top:16px;color:var(--mut);font-size:13px}
+</style>
+</head>
+<body>
+<div class="login">
+  <form class="lcard" id="f">
+    <div class="llogo">
+      <svg width="32" height="32" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB020"/><path d="M9.5 22v-6M16 22V9.5M22.5 22v-9" stroke="#0B0F14" stroke-width="3.4" stroke-linecap="round"/></svg>
+      App<em>Control</em>
+    </div>
+    <h1>Ingresar</h1>
+    <p class="lsub">Control de avance de obra · residentes y supervisores</p>
+    <div class="stripe"></div>
+    <label>Usuario</label><input id="u" placeholder="999000111" autocomplete="username"/>
+    <label>PIN</label><input id="p" type="password" placeholder="••••" autocomplete="current-password"/>
+    <button class="btn">Entrar</button>
+    <div class="msg" id="m"></div>
+    <a class="back" href="/">← Volver al inicio</a>
+  </form>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const m = document.getElementById('m'); m.textContent = ''; m.className = 'msg';
+  const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: document.getElementById('u').value, pin: document.getElementById('p').value }) });
+  const d = await r.json();
+  if (d.success) location.href = '/registro';
+  else { m.textContent = 'Credenciales inválidas'; m.className = 'msg err'; }
+});
+</script>
+</body>
+</html>

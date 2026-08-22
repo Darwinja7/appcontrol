@@ -1,0 +1,177 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AppControl — Control de avance de obra en tiempo real</title>
+<meta name="description" content="Registra avances por apartamento, nivel y actividad desde Telegram o la web, y mide el avance real ponderado por capítulo."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0F14;--panel:#10151C;--panel2:#0D1219;--line:#202A36;--amber:#FFB020;--amber2:#FF8A00;--txt:#EAF0F6;--mut:#93A1B0;--green:#2FBF71;--red:#E5695E;--blue:#5B8DB8;--tan:#B98A2E;--rad:16px}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.disp{font-family:"Space Grotesk",Inter,sans-serif}
+a{text-decoration:none;color:inherit}
+::selection{background:var(--amber);color:#10141A}
+.nav{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:14px 26px;background:rgba(11,15,20,.72);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:10px;font-family:"Space Grotesk";font-weight:700;font-size:18px;letter-spacing:-.01em}
+.logo em{font-style:normal;color:var(--amber)}
+.nav .btn-s{padding:9px 18px;font-size:14px}
+.btn-p{display:inline-block;background:linear-gradient(135deg,var(--amber),var(--amber2));color:#10141A;font-weight:700;padding:14px 28px;border-radius:12px;box-shadow:0 12px 32px rgba(255,138,0,.28);transition:.25s}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(255,138,0,.38)}
+.btn-s{display:inline-block;border:1px solid var(--line);color:var(--txt);padding:12px 22px;border-radius:12px;font-weight:600;transition:.25s}
+.btn-s:hover{border-color:var(--amber);color:var(--amber)}
+.hero{position:relative;max-width:1160px;margin:0 auto;padding:96px 26px 80px;display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,176,32,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,176,32,.05) 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(800px 500px at 30% 20%,#000 30%,transparent 75%);pointer-events:none}
+.hero::after{content:"";position:absolute;top:-140px;right:-80px;width:520px;height:520px;background:radial-gradient(circle,rgba(255,176,32,.14),transparent 65%);pointer-events:none}
+.badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 14px;font-size:12.5px;color:var(--mut)}
+.badge i{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.hero h1{font-size:clamp(40px,5.2vw,66px);line-height:1.04;letter-spacing:-.02em;margin:22px 0 18px}
+.hl{background:linear-gradient(transparent 64%,rgba(255,176,32,.30) 0)}
+.hero p{color:var(--mut);font-size:17px;line-height:1.65;max-width:540px}
+.cta-row{display:flex;gap:14px;margin:30px 0 8px;flex-wrap:wrap}
+.ticks{list-style:none;display:flex;gap:22px;flex-wrap:wrap;margin-top:26px}
+.ticks li{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:13.5px}
+.ticks svg{flex:none}
+.stats{display:flex;gap:38px;margin-top:44px;flex-wrap:wrap}
+.stats b{display:block;font-family:"Space Grotesk";font-size:30px;color:var(--amber)}
+.stats span{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.mock{position:relative;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 40px 90px rgba(0,0,0,.55)}
+.mock-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;letter-spacing:.12em;color:var(--mut)}
+.mock-top b{font-family:"Space Grotesk";font-size:26px;color:var(--txt);letter-spacing:0}
+.mbar{height:9px;background:#18212C;border-radius:99px;overflow:hidden;margin:10px 0 6px}
+.mbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--amber),var(--amber2));animation:grow 1.4s .4s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes grow{to{width:var(--w)}}
+.mrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin:12px 0 5px}
+.mrow b{color:var(--txt);font-weight:600}
+.mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:18px}
+.chip{padding:5px 0;text-align:center;border-radius:7px;font-size:11px;font-weight:600}
+.c0{background:#2A3138;color:#B9C1C9}.c1{background:#5E3732;color:#F0D2CD}.c2{background:#6E5620;color:#F4E5BE}.c3{background:#31567C;color:#DCEAF7}.c4{background:#245C43;color:#D5EFE2}
+.toast{position:absolute;background:#0F151C;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:12.5px;box-shadow:0 16px 40px rgba(0,0,0,.5);animation:float 6s ease-in-out infinite}
+.t1{right:-16px;top:22%}.t2{left:-18px;bottom:12%;animation-delay:1.4s}
+@keyframes float{50%{transform:translateY(-9px)}}
+.stripe{height:10px;background:repeating-linear-gradient(-45deg,var(--amber) 0 14px,var(--bg) 14px 28px)}
+.sec{max-width:1160px;margin:0 auto;padding:88px 26px}
+.sec h2{font-size:clamp(26px,3.3vw,40px);letter-spacing:-.01em}
+.sec .sub{color:var(--mut);max-width:640px;margin-top:12px;line-height:1.6}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+.step{border:1px solid var(--line);background:var(--panel);border-radius:var(--rad);padding:26px;transition:.3s}
+.step:hover{transform:translateY(-5px);border-color:rgba(255,176,32,.5)}
+.step .num{font-family:"Space Grotesk";font-size:46px;font-weight:700;color:transparent;-webkit-text-stroke:1.2px var(--amber)}
+.step h3{margin:14px 0 8px;font-size:18px}
+.step p{color:var(--mut);font-size:14px;line-height:1.6}
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+.feat{border:1px solid var(--line);background:var(--panel);border-radius:var(--rad);padding:24px;transition:.3s}
+.feat:hover{transform:translateY(-5px);border-color:rgba(255,176,32,.5)}
+.feat .ic{width:42px;height:42px;border-radius:11px;background:rgba(255,176,32,.12);display:grid;place-items:center;margin-bottom:16px}
+.feat h3{font-size:16px;margin-bottom:8px}
+.feat p{color:var(--mut);font-size:13.5px;line-height:1.6}
+.band{border-block:1px solid var(--line);background:linear-gradient(135deg,#121A23,#0C1118);text-align:center;padding:84px 26px}
+.band h2{font-size:clamp(28px,4vw,52px)}
+.band p{color:var(--mut);margin:14px auto 30px;max-width:520px}
+footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-width:1160px;margin:0 auto;padding:28px 26px;color:var(--mut);font-size:13px}
+.rev{opacity:0;transform:translateY(20px);transition:.7s cubic-bezier(.2,.7,.2,1)}
+.rev.on{opacity:1;transform:none}
+@media(max-width:960px){.hero{grid-template-columns:1fr;padding-top:64px;gap:44px}.steps,.feats{grid-template-columns:1fr}.t1{right:6px}.t2{left:6px}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="logo" href="/">
+    <svg width="30" height="30" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB020"/><path d="M9.5 22v-6M16 22V9.5M22.5 22v-9" stroke="#0B0F14" stroke-width="3.4" stroke-linecap="round"/></svg>
+    App<em>Control</em>
+  </a>
+  <a class="btn-s btn-p" style="border:none" href="/login.html">Ingresar</a>
+</nav>
+
+<header class="hero">
+  <div>
+    <span class="badge"><i></i> Control de obra en tiempo real</span>
+    <h1>Tu obra, medida <span class="hl">apartamento por apartamento</span>.</h1>
+    <p>AppControl registra avances por nivel, zona y actividad desde Telegram o la web, valida cada dato contra tus catálogos y calcula el avance real del proyecto ponderando cada capítulo por su incidencia.</p>
+    <div class="cta-row">
+      <a class="btn-p" href="/login.html">Ingresar a AppControl</a>
+      <a class="btn-s" href="#como">Cómo funciona</a>
+    </div>
+    <ul class="ticks">
+      <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Dos canales, un solo registro</li>
+      <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Avance ponderado real</li>
+      <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Grid por apartamento</li>
+    </ul>
+    <div class="stats">
+      <div><b data-count="2">0</b><span>canales</span></div>
+      <div><b data-count="19">0</b><span>niveles</span></div>
+      <div><b data-count="5">0</b><span>estados</span></div>
+      <div><b data-count="100">0</b><span>% trazable</span></div>
+    </div>
+  </div>
+
+  <div class="mock rev">
+    <div class="mock-top"><span>PROYECTO P001 · TORRE T1</span><b><span data-count="38">0</span>%</b></div>
+    <div class="mbar"><i style="--w:38%"></i></div>
+    <div class="mrow"><b>ESTRUCTURA</b><span>62% · inc 33%</span></div>
+    <div class="mbar"><i style="--w:62%"></i></div>
+    <div class="mrow"><b>MAMPOSTERÍA</b><span>41% · inc 12%</span></div>
+    <div class="mbar"><i style="--w:41%"></i></div>
+    <div class="mrow"><b>CARPINTERÍA MADERA</b><span>70% · inc 10%</span></div>
+    <div class="mbar"><i style="--w:70%"></i></div>
+    <div class="mgrid">
+      <span class="chip c4">Listo</span><span class="chip c4">Listo</span><span class="chip c3">En remate</span><span class="chip c2">En curso</span><span class="chip c4">Listo</span><span class="chip c1">Replanteo</span>
+      <span class="chip c2">En curso</span><span class="chip c4">Listo</span><span class="chip c0">Sin empezar</span><span class="chip c2">En curso</span><span class="chip c4">Listo</span><span class="chip c0">Sin empezar</span>
+    </div>
+    <div class="toast t1">✅ OB-000012 · VALIDADO</div>
+    <div class="toast t2">📨 Telegram → captura</div>
+  </div>
+</header>
+
+<div class="stripe"></div>
+
+<section class="sec" id="como">
+  <h2 class="rev">Así funciona</h2>
+  <p class="sub rev">Menos planilla, más obra: el registro diario toma segundos y el avance se calcula solo.</p>
+  <div class="steps">
+    <div class="step rev"><div class="num">01</div><h3>Reporta</h3><p>El residente envía el avance por Telegram o lo marca en el grid web: Sin empezar → En replanteo → En curso → En remate → Listo.</p></div>
+    <div class="step rev"><div class="num">02</div><h3>Valida</h3><p>AppControl verifica usuario, proyecto, torre, nivel, zona y actividad contra los catálogos antes de escribir. Lo inválido se rechaza con su código.</p></div>
+    <div class="step rev"><div class="num">03</div><h3>Mide</h3><p>Cada registro alimenta el grid por apartamento y el avance ponderado: actividad → capítulo → proyecto, según su incidencia real.</p></div>
+  </div>
+</section>
+
+<section class="sec" style="padding-top:0">
+  <h2 class="rev">Hecho para la obra</h2>
+  <div class="feats">
+    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><h3>Dos canales, un registro</h3><p>Telegram y formulario web escriben en el mismo lugar, con idempotencia: nada se duplica aunque el mensaje se reenvíe.</p></div>
+    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div><h3>Grid por apartamento</h3><p>Vista tipo tablero por nivel y zona, incluidos niveles especiales, punto fijo, lobby y amenidades.</p></div>
+    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M12 3v18M5 8l7-5 7 5M5 8v8a3 3 0 0 0 6 0V8M19 8v8a3 3 0 0 1-6 0V8"/></svg></div><h3>Avance ponderado</h3><p>100% de estructura no es lo mismo que 100% de aseo: cada capítulo aporta al proyecto según su incidencia, y cada actividad a su capítulo.</p></div>
+    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div><h3>Maestro por Excel</h3><p>Proyectos, usuarios, capítulos, niveles, zonas y actividades se cargan y completan desde una plantilla maestra.</p></div>
+    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Validación de origen</h3><p>Usuarios activos, zonas existentes y actividades permitidas por alcance. El error sale con código y mensaje claro.</p></div>
+    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></svg></div><h3>Storage evolutivo</h3><p>Hoy Google Sheets, mañana Supabase: la misma interfaz de datos, sin reescribir la app.</p></div>
+  </div>
+</section>
+
+<section class="band">
+  <h2 class="rev">Menos planilla. Más obra.</h2>
+  <p class="rev">Entra, registra el primer avance y mira el proyecto moverse.</p>
+  <a class="btn-p rev" href="/login.html">Ingresar ahora</a>
+</section>
+
+<footer>
+  <span>AppControl · control de avance de obra</span>
+  <span>MVP Google Sheets · listo para Supabase</span>
+</footer>
+
+<script>
+const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && e.target.classList.add("on")), { threshold: .15 });
+document.querySelectorAll(".rev").forEach((el) => io.observe(el));
+document.querySelectorAll("[data-count]").forEach((el) => {
+  const end = +el.dataset.count, t0 = performance.now(), dur = 1300;
+  (function f(t) { const p = Math.min(1, (t - t0) / dur); el.textContent = Math.round(end * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(f); })(t0);
+});
+</script>
+</body>
+</html>
+
