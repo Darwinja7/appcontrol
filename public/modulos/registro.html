@@ -2,6 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<meta name="theme-color" content="#0B0F14"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <title>Registro</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/main.css"/>
@@ -81,7 +85,7 @@ async function guardar() {
   const d = await api("/api/registro-save", { method: "POST", body: JSON.stringify({ items }) });
   btn.disabled = false; btn.textContent = "Guardar";
   if (d.success) {
-    alert(d.offline ? "Guardado offline. Se sincronizará al haber señal." : "Registrado correctamente (" + d.registrados + ").");
+    alert(d.offline ? "Guardado offline. Se sincronizarÃ¡ al haber seÃ±al." : "Registrado correctamente (" + d.registrados + ").");
     SEL.clear();
     D = await api("/api/data"); rebuildLast(); render();
   }

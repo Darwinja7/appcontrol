@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax check (funciones serverless)
+        run: |
+          for f in api/*.js api/_lib/*.js; do
+            cp "$f" /tmp/check.mjs
+            node --check /tmp/check.mjs
+            echo "OK $f"
+          done
+
+      - name: Validar JSON de configuracion
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('OK package.json')"
+          node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8')); console.log('OK vercel.json')"
+          node -e "JSON.parse(require('fs').readFileSync('public/manifest.webmanifest','utf8')); console.log('OK manifest.webmanifest')"
