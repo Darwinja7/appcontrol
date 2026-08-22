@@ -80,3 +80,109 @@ pre{background:#0C1118;border:1px solid var(--line);padding:12px;border-radius:1
   /* KPIs en Dashboard */
   .kpis { grid-template-columns: 1fr 1fr; }
 }
+
+/* === IMPECCABLE: TYPOGRAPHY & HIERARCHY === */
+/* Regla: No usar Inter genérico para todo - jerarquía con pesos diferentes */
+h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 0.5em; }
+h2 { font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; margin-top: 1.5em; margin-bottom: 0.5em; }
+h3 { font-size: clamp(1.17rem, 3vw, 1.5rem); font-weight: 600; letter-spacing: -0.005em; line-height: 1.3; margin-top: 1.2em; margin-bottom: 0.4em; }
+h4 { font-size: clamp(1rem, 2.5vw, 1.25rem); font-weight: 500; line-height: 1.4; margin-top: 1em; margin-bottom: 0.3em; }
+
+/* Regla: Texto gris sobre fondos de color - siempre usar texto blanco o muy claro */
+.card p, .card label { color: rgba(234, 240, 246, 0.85); }
+.card h2, .card h3 { color: #EAF0F6; }
+
+/* Regla: Spacing consistente (8px base) */
+.card { padding: clamp(16px, 4vw, 24px); }
+.card + .card { margin-top: 16px; }
+
+/* Regla: Line length óptimo (60-80 caracteres) */
+.card p, .card li { max-width: 65ch; }
+
+/* Regla: Touch targets mínimos 44x44px en mobile */
+.btn, select, input[type="checkbox"] + span { min-height: 44px; }
+
+/* === IMPECCABLE: MOTION & TRANSITIONS === */
+/* Regla: Motion con propósito, no bounce/elastic */
+.card, .btn, .chip { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255, 176, 32, 0.15); }
+.btn:active { transform: translateY(0); }
+.chip:hover { transform: scale(1.02); }
+
+/* === IMPECCABLE: COLOR STRATEGY === */
+/* Regla: No usar solo un color - paleta estratégica */
+:root {
+  --amber: #FFB020;
+  --amber-dark: #E89900;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #3B82F6;
+}
+
+/* Estados con color semántico */
+.msg.ok { color: var(--success); }
+.msg.err { color: var(--danger); }
+
+/* === IMPECCABLE: EMPTY STATES === */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: rgba(234, 240, 246, 0.6);
+}
+.empty-state svg { width: 64px; height: 64px; margin-bottom: 16px; opacity: 0.4; }
+.empty-state h3 { color: rgba(234, 240, 246, 0.8); margin-bottom: 8px; }
+
+/* === IMPECCABLE: ACCESSIBILITY === */
+/* Regla: Focus visible claro */
+.btn:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* Regla: Skip link para teclado */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--amber);
+  color: #000;
+  padding: 8px 16px;
+  z-index: 100;
+  font-weight: 600;
+}
+.skip-link:focus { top: 0; }
+
+/* === IMPECCABLE: GRID IMPROVEMENTS === */
+/* Regla: Mejor contraste y legibilidad en tablas */
+table.grid { font-size: 0.875rem; }
+table.grid th { 
+  background: rgba(255, 176, 32, 0.05); 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  font-size: 0.75rem; 
+  letter-spacing: 0.05em;
+}
+table.grid td.lvl { font-weight: 600; color: var(--amber); }
+
+/* === IMPECCABLE: RESPONSIVE REFINEMENT === */
+@media (max-width: 768px) {
+  .card { border-radius: 12px; }
+  .gridwrap { border-radius: 12px; }
+  table.grid { font-size: 0.75rem; }
+}
+
+/* === IMPECCABLE: LOADING STATES === */
+.btn[data-loading] { opacity: 0.7; pointer-events: none; }
+.btn[data-loading]::after {
+  content: '';
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

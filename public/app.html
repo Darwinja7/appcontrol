@@ -2,128 +2,155 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AppControl</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <meta name="theme-color" content="#0B0F14"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<title>AppControl ERP</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/erp.css"/>
 </head>
 <body>
 
-<!-- SIDEBAR (Estilo SINCO) -->
+<a href="#main-content" class="skip-link">Saltar al contenido</a>
+
 <aside class="sidebar" id="sidebar">
   <div class="brand-area">
-    <div class="logo">App<b>Control</b></div>
-    <div class="project-sel">PROYECTO ACTIVO ▼</div>
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="8" fill="#FFB020"/>
+        <path d="M8 22V10M16 22V8M24 22V14" stroke="#0B0F14" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <span>App<b>Control</b></span>
+    </div>
+    <div class="project-sel">
+      <span class="project-label">Proyecto activo</span>
+      <span class="project-name">Configurar →</span>
+    </div>
   </div>
   
-  <nav class="menu">
-    <div class="menu-group">OPERACIÓN</div>
-    <a href="#" class="menu-item active" data-mod="registro">📝 Registro de Avance</a>
-    <a href="#" class="menu-item" data-mod="dashboard">📊 Dashboard / KPIs</a>
+  <nav class="menu" aria-label="Navegación principal">
+    <div class="menu-section">
+      <div class="menu-group">OPERACIÓN</div>
+      <a href="#" class="menu-item active" data-mod="registro" aria-current="page">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span>Registro</span>
+      </a>
+      <a href="#" class="menu-item" data-mod="dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+    </div>
     
-    <div class="menu-group" id="admin-group" style="display:none">ADMINISTRACIÓN</div>
-    <a href="#" class="menu-item admin-only" data-mod="configuracion" style="display:none">⚙️ Configuración</a>
-    
-    <!-- Espacio para futuros módulos -->
-    <div class="menu-group future">FUTURO</div>
-    <a href="#" class="menu-item disabled">📦 Entregas (Próximamente)</a>
-    <a href="#" class="menu-item disabled">🛠️ Postventa (Próximamente)</a>
+    <div class="menu-section admin-only" style="display:none">
+      <div class="menu-group">ADMINISTRACIÓN</div>
+      <a href="#" class="menu-item" data-mod="configuracion">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+        <span>Configuración</span>
+      </a>
+    </div>
   </nav>
 
   <div class="user-area">
     <div class="user-info">
-      <span id="user-name">Cargando...</span>
-      <span id="user-role" class="role-badge">...</span>
+      <div class="user-avatar" id="user-avatar">U</div>
+      <div class="user-details">
+        <div class="user-name" id="user-name">Cargando...</div>
+        <div class="user-role" id="user-role">...</div>
+      </div>
     </div>
-    <button id="btn-logout" class="btn-icon">🚪</button>
+    <button id="btn-logout" class="btn-icon" aria-label="Cerrar sesión" title="Cerrar sesión">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+      </svg>
+    </button>
   </div>
 </aside>
 
-<!-- MAIN CONTENT -->
-<main class="main-content">
+<main class="main-content" id="main-content">
   <header class="topbar-mobile">
-    <button id="toggle-menu" class="btn-icon">☰</button>
-    <span class="page-title" id="page-title">Registro</span>
+    <button id="toggle-menu" class="btn-icon" aria-label="Abrir menú">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <h1 class="page-title" id="page-title">Registro</h1>
   </header>
   
-  <!-- Aquí se inyectan los módulos -->
-  <iframe id="module-frame" src="/modulos/registro.html" frameborder="0"></iframe>
+  <iframe id="module-frame" src="/modulos/registro.html" title="Módulo actual" frameborder="0"></iframe>
 </main>
 
-<!-- OFFLINE BADGE GLOBAL -->
-<div id="offline-badge"></div>
+<div id="offline-badge" role="status" aria-live="polite"></div>
 
 <script src="/js/app.js"></script>
 <script>
-  // --- LÓGICA DEL SHELL ---
-  const frame = document.getElementById("module-frame");
-  const title = document.getElementById("page-title");
+const frame = document.getElementById("module-frame");
+const title = document.getElementById("page-title");
   
-  // 1. Verificar sesión y roles
-  async function checkAuth() {
-    try {
-      const res = await fetch("/api/me");
-      const data = await res.json();
-      if (!data.success) throw 0;
-      
-      document.getElementById("user-name").textContent = data.usuario.nombre;
-      document.getElementById("user-role").textContent = data.usuario.rol;
-      
-      // Control de acceso por rol
-      if (data.usuario.rol === "ADMIN") {
-        document.getElementById("admin-group").style.display = "block";
-        document.querySelectorAll(".admin-only").forEach(el => el.style.display = "flex");
-      } else if (data.usuario.rol === "VISUALIZADOR") {
-        // Visualizadores no pueden registrar, redirigir a dashboard
-        loadModule("dashboard");
-        document.querySelector('[data-mod="registro"]').style.display = "none";
-      }
-      
-      initApp(); // Iniciar lógica offline global
-    } catch (e) {
-      location.href = "/login.html";
+async function checkAuth() {
+  try {
+    const res = await fetch("/api/me");
+    const data = await res.json();
+    if (!data.success) throw 0;
+    
+    document.getElementById("user-name").textContent = data.usuario.nombre;
+    document.getElementById("user-role").textContent = data.usuario.rol;
+    document.getElementById("user-avatar").textContent = data.usuario.nombre.charAt(0).toUpperCase();
+    
+    if (data.usuario.rol === "ADMIN") {
+      document.querySelector('.admin-only').style.display = "block";
+    } else if (data.usuario.rol === "VISUALIZADOR") {
+      loadModule("dashboard");
+      document.querySelector('[data-mod="registro"]').style.display = "none";
     }
+    
+    initApp();
+  } catch (e) {
+    location.href = "/login.html";
   }
+}
 
-  // 2. Navegación SPA (Single Page Application)
-  function loadModule(modName) {
-    // Actualizar iframe
-    frame.src = `/modulos/${modName}.html`;
-    
-    // Actualizar título
-    const names = { "registro": "Registro de Avance", "dashboard": "Dashboard", "configuracion": "Configuración" };
-    title.textContent = names[modName] || modName;
-    
-    // Actualizar menú activo
-    document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("active"));
-    const activeLink = document.querySelector(`[data-mod="${modName}"]`);
-    if(activeLink) activeLink.classList.add("active");
-    
-    // Cerrar menú en móvil
-    if(window.innerWidth <= 768) document.getElementById("sidebar").classList.remove("open");
-  }
-
-  // Event Listeners
-  document.querySelectorAll(".menu-item:not(.disabled)").forEach(item => {
-    item.addEventListener("click", (e) => {
-      e.preventDefault();
-      loadModule(item.dataset.mod);
-    });
+function loadModule(modName) {
+  frame.src = `/modulos/${modName}.html`;
+  const names = { "registro": "Registro de Avance", "dashboard": "Dashboard & KPIs", "configuracion": "Configuración" };
+  title.textContent = names[modName] || modName;
+  
+  document.querySelectorAll(".menu-item").forEach(el => {
+    el.classList.remove("active");
+    el.removeAttribute("aria-current");
   });
+  const activeLink = document.querySelector(`[data-mod="${modName}"]`);
+  if(activeLink) {
+    activeLink.classList.add("active");
+    activeLink.setAttribute("aria-current", "page");
+  }
+  
+  if(window.innerWidth <= 768) document.getElementById("sidebar").classList.remove("open");
+}
 
-  document.getElementById("btn-logout").onclick = async () => {
-    await fetch("/api/logout", { method: "POST" });
-    location.href = "/";
-  };
+document.querySelectorAll(".menu-item").forEach(item => {
+  item.addEventListener("click", (e) => {
+    e.preventDefault();
+    loadModule(item.dataset.mod);
+  });
+});
 
-  document.getElementById("toggle-menu").onclick = () => {
-    document.getElementById("sidebar").classList.toggle("open");
-  };
+document.getElementById("btn-logout").onclick = async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.href = "/";
+};
 
-  checkAuth();
+document.getElementById("toggle-menu").onclick = () => {
+  document.getElementById("sidebar").classList.toggle("open");
+};
+
+checkAuth();
 </script>
 </body>
 </html>
