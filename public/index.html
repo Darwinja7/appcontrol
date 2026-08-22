@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>AppControl — Control de avance de obra en tiempo real</title>
-<meta name="description" content="Registra avances por nivel, zona y actividad desde el celular, y mide el avance real ponderado por capítulo."/>
+<title>AppControl — La obra en vivo</title>
+<meta name="description" content="30 segundos por nivel. El avance real de la obra, desde tu celular."/>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <meta name="theme-color" content="#0B0F14"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0B0F14;--panel:#10151C;--panel2:#0D1219;--line:#202A36;--amber:#FFB020;--amber2:#FF8A00;--txt:#EAF0F6;--mut:#93A1B0;--green:#2FBF71}
 *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
@@ -19,66 +19,68 @@ h1,h2,.disp{font-family:"Space Grotesk",Inter,sans-serif}a{text-decoration:none;
 .grain{position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:1;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.4'/></svg>")}
 .nav{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:14px 26px;background:rgba(11,15,20,.72);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .logo{display:flex;align-items:center;gap:10px;font-family:"Space Grotesk";font-weight:700;font-size:18px}.logo em{font-style:normal;color:var(--amber)}
-.btn-p{display:inline-block;background:linear-gradient(135deg,var(--amber),var(--amber2));color:#10141A;font-weight:700;padding:14px 28px;border-radius:12px;box-shadow:0 12px 32px rgba(255,138,0,.28);transition:.25s;border:none;cursor:pointer}
-.btn-p:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(255,138,0,.38)}
+.nav-links{display:flex;gap:22px;align-items:center}.nav-links a{color:var(--mut);font-size:14px;font-weight:600}.nav-links a:hover{color:var(--amber)}
+.btn-p{display:inline-block;background:linear-gradient(135deg,var(--amber),var(--amber2));color:#10141A;font-weight:800;padding:14px 28px;border-radius:12px;box-shadow:0 12px 32px rgba(255,138,0,.28);transition:.25s;border:none;cursor:pointer}
+.btn-p:hover{transform:translateY(-2px)}
 .btn-s{display:inline-block;border:1px solid var(--line);color:var(--txt);padding:12px 22px;border-radius:12px;font-weight:600;transition:.25s}
 .btn-s:hover{border-color:var(--amber);color:var(--amber)}
-.hero{position:relative;max-width:1160px;margin:0 auto;padding:90px 26px 90px;display:grid;grid-template-columns:1.05fr .95fr;gap:60px;align-items:center}
+/* HERO */
+.hero{position:relative;max-width:1180px;margin:0 auto;padding:70px 26px 80px;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
 .orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
-.o1{width:440px;height:440px;background:var(--amber2);top:-140px;right:-80px;opacity:.16}
+.o1{width:460px;height:460px;background:var(--amber2);top:-140px;right:-60px;opacity:.16}
 .o2{width:380px;height:380px;background:#3B82F6;bottom:-160px;left:-100px;opacity:.10}
-.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,176,32,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,176,32,.05) 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(800px 520px at 30% 20%,#000 30%,transparent 75%);pointer-events:none}
-.badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 14px;font-size:12.5px;color:var(--mut)}
-.badge i{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-@keyframes pulse{50%{opacity:.35}}
-.hero h1{font-size:clamp(40px,5.2vw,66px);line-height:1.04;letter-spacing:-.02em;margin:22px 0 18px}
-.hl{background:linear-gradient(transparent 64%,rgba(255,176,32,.30) 0)}
-.hero p{color:var(--mut);font-size:17px;line-height:1.65;max-width:540px}
-.cta-row{display:flex;gap:14px;margin:30px 0 8px;flex-wrap:wrap}
-.ticks{list-style:none;display:flex;gap:22px;flex-wrap:wrap;margin-top:26px}
-.ticks li{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:13.5px}
-.stats{display:flex;gap:38px;margin-top:44px;flex-wrap:wrap}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,176,32,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,176,32,.05) 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(820px 540px at 30% 20%,#000 30%,transparent 75%);pointer-events:none}
+.kicker{letter-spacing:.3em;text-transform:uppercase;color:var(--amber);font-size:11px;font-weight:700}
+.hero h1{font-size:clamp(42px,5.6vw,74px);line-height:1.02;letter-spacing:-.025em;margin:18px 0 18px;font-weight:700}
+.hl{background:linear-gradient(transparent 62%,rgba(255,176,32,.32) 0)}
+.hero p{color:var(--mut);font-size:17px;line-height:1.65;max-width:520px}
+.cta-row{display:flex;gap:14px;margin:30px 0 6px;flex-wrap:wrap;align-items:center}
+.cta-big{padding:18px 36px;font-size:17px;border-radius:14px;animation:glow 2.6s infinite}
+@keyframes glow{50%{box-shadow:0 0 0 12px rgba(255,176,32,.10),0 18px 44px rgba(255,138,0,.5)}}
+.micro{color:var(--mut);font-size:12.5px;margin-top:14px}
+.stats{display:flex;gap:36px;margin-top:40px;flex-wrap:wrap}
 .stats b{display:block;font-family:"Space Grotesk";font-size:30px;color:var(--amber)}
-.stats span{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
-.crane{position:absolute;top:4%;right:2%;width:170px;animation:sway 9s ease-in-out infinite;transform-origin:50% 90%;z-index:0}
-@keyframes sway{50%{transform:rotate(1.4deg)}}
-.crane .hook{animation:drop 6s ease-in-out infinite}
-@keyframes drop{50%{transform:translateY(16px)}}
-.mock{position:relative;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 40px 90px rgba(0,0,0,.55);z-index:2}
-.mock-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;letter-spacing:.12em;color:var(--mut)}
-.mock-top b{font-family:"Space Grotesk";font-size:26px;color:var(--txt);letter-spacing:0}
-.mbar{height:9px;background:#18212C;border-radius:99px;overflow:hidden;margin:10px 0 6px}
-.mbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--amber),var(--amber2));animation:grow 1.4s .4s cubic-bezier(.2,.7,.2,1) forwards}
-@keyframes grow{to{width:var(--w)}}
-.mrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin:12px 0 5px}.mrow b{color:var(--txt)}
-.mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:18px}
-.chip{padding:5px 0;text-align:center;border-radius:7px;font-size:11px;font-weight:600;transition:.4s}
-.c0{background:#2A3138;color:#B9C1C9}.c1{background:#5E3732;color:#F0D2CD}.c2{background:#6E5620;color:#F4E5BE}.c3{background:#31567C;color:#DCEAF7}.c4{background:#245C43;color:#D5EFE2}
-.toast{position:absolute;background:#0F151C;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:12.5px;box-shadow:0 16px 40px rgba(0,0,0,.5);animation:float 6s ease-in-out infinite}
-.t1{right:-16px;top:22%}.t2{left:-18px;bottom:12%;animation-delay:1.4s}
-@keyframes float{50%{transform:translateY(-9px)}}
-.skyline{position:absolute;bottom:0;left:0;right:0;height:200px;width:100%;z-index:0}
-.win{animation:blink 4s infinite}.win:nth-child(2n){animation-delay:1.3s}.win:nth-child(3n){animation-delay:2.4s}
-@keyframes blink{0%,100%{opacity:.12}50%{opacity:.9}}
-.stripe{height:10px;background:repeating-linear-gradient(-45deg,var(--amber) 0 14px,var(--bg) 14px 28px)}
-.sec{max-width:1160px;margin:0 auto;padding:88px 26px;position:relative}
-.sec h2{font-size:clamp(26px,3.3vw,40px)}
-.sec .sub{color:var(--mut);max-width:640px;margin-top:12px;line-height:1.6}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
-.step{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:26px;transition:.3s}
-.step:hover{transform:translateY(-5px);border-color:rgba(255,176,32,.5)}
-.step .num{font-family:"Space Grotesk";font-size:46px;font-weight:700;color:transparent;-webkit-text-stroke:1.2px var(--amber)}
-.step h3{margin:14px 0 8px;font-size:18px}.step p{color:var(--mut);font-size:14px;line-height:1.6}
-.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
-.feat{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:24px;transition:.3s}
-.feat:hover{transform:translateY(-5px);border-color:rgba(255,176,32,.5)}
-.feat .ic{width:42px;height:42px;border-radius:11px;background:rgba(255,176,32,.12);display:grid;place-items:center;margin-bottom:16px}
-.feat h3{font-size:16px;margin-bottom:8px}.feat p{color:var(--mut);font-size:13.5px;line-height:1.6}
-.band{border-block:1px solid var(--line);background:linear-gradient(135deg,#121A23,#0C1118);text-align:center;padding:84px 26px}
-.band h2{font-size:clamp(28px,4vw,52px)}.band p{color:var(--mut);margin:14px auto 30px;max-width:520px}
-footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-width:1160px;margin:0 auto;padding:28px 26px;color:var(--mut);font-size:13px}
-.rev{opacity:0;transform:translateY(20px);transition:.7s cubic-bezier(.2,.7,.2,1)}.rev.on{opacity:1;transform:none}
-@media(max-width:960px){.hero{grid-template-columns:1fr;padding-top:60px;gap:44px}.steps,.feats{grid-template-columns:1fr}.t1{right:6px}.t2{left:6px}.crane{width:110px;top:2%}}
+.stats span{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+/* DEMO INTERACTIVA */
+.demo{position:relative;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:0 40px 90px rgba(0,0,0,.55);z-index:2}
+.demo-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:.12em;color:var(--mut);margin-bottom:6px}
+.demo-top b{font-family:"Space Grotesk";font-size:20px;color:var(--txt);letter-spacing:0}
+.demo-hint{font-size:12.5px;color:var(--amber);margin-bottom:14px;font-weight:600}
+.tower{display:grid;gap:8px}
+.floor{display:grid;grid-template-columns:52px repeat(4,1fr);gap:8px;align-items:center}
+.floor .lbl{font-size:11px;color:var(--mut);letter-spacing:.1em}
+.win{height:48px;border-radius:8px;border:1px solid #1D3552;background:#16202B;cursor:pointer;transition:.35s;position:relative}
+.win:hover{transform:scale(1.04)}
+.w0{background:#16202B}.w1{background:#5E3732;border-color:#7E4A44}.w2{background:#6E5620;border-color:#8A6D2B}.w3{background:#31567C;border-color:#3E6E9E}.w4{background:#245C43;border-color:#2E6B52;box-shadow:0 0 14px rgba(46,107,82,.5)}
+.demo-pct-row{display:flex;align-items:center;gap:16px;margin-top:18px}
+.demo-pct{font-family:"Space Grotesk";font-size:56px;color:var(--amber);letter-spacing:-.02em;min-width:150px}
+.demo-bar{flex:1;height:10px;background:#18212C;border-radius:99px;overflow:hidden}
+.demo-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--amber2));border-radius:99px;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.demo-cap{font-size:12px;color:var(--mut);margin-top:10px}
+/* TICKER */
+.ticker{overflow:hidden;border-block:1px solid var(--line);background:#0D1219}
+.ticker-track{display:flex;gap:44px;padding:12px 0;width:max-content;animation:tick 30s linear infinite}
+.ticker:hover .ticker-track{animation-play-state:paused}
+@keyframes tick{to{transform:translateX(-50%)}}
+.ticker span{color:var(--mut);font-size:13px;white-space:nowrap}
+.ticker b{color:var(--txt)}
+/* SECCIONES */
+.sec{max-width:1180px;margin:0 auto;padding:88px 26px;position:relative}
+.sec h2{font-size:clamp(28px,3.4vw,44px);letter-spacing:-.015em}
+.sec .sub{color:var(--mut);max-width:640px;margin-top:12px;line-height:1.6;font-size:16px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+.card2{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:26px;transition:.3s}
+.card2:hover{transform:translateY(-5px);border-color:rgba(255,176,32,.5)}
+.card2 .ic{width:44px;height:44px;border-radius:12px;background:rgba(255,176,32,.12);display:grid;place-items:center;margin-bottom:16px}
+.card2 h3{font-size:17px;margin-bottom:8px}
+.card2 p{color:var(--mut);font-size:14px;line-height:1.65}
+.card2 .tag{display:inline-block;margin-top:14px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);font-weight:700}
+.band{border-block:1px solid var(--line);background:linear-gradient(135deg,#121A23,#0C1118);text-align:center;padding:90px 26px;position:relative;overflow:hidden}
+.band h2{font-size:clamp(30px,4.4vw,58px)}
+.band p{color:var(--mut);margin:16px auto 32px;max-width:540px;font-size:16px}
+footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-width:1180px;margin:0 auto;padding:28px 26px;color:var(--mut);font-size:13px}
+.rev{opacity:0;transform:translateY(22px);transition:.7s cubic-bezier(.2,.7,.2,1)}.rev.on{opacity:1;transform:none}
+@media(max-width:960px){.hero{grid-template-columns:1fr;padding-top:50px;gap:40px}.cards{grid-template-columns:1fr}.nav-links a:not(.btn-p){display:none}}
 </style>
 </head>
 <body>
@@ -88,95 +90,72 @@ footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-wi
     <svg width="30" height="30" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB020"/><path d="M9.5 22v-6M16 22V9.5M22.5 22v-9" stroke="#0B0F14" stroke-width="3.4" stroke-linecap="round"/></svg>
     App<em>Control</em>
   </a>
-  <a class="btn-p" style="padding:9px 20px;font-size:14px" href="/login.html">Ingresar</a>
+  <div class="nav-links">
+    <a href="#residentes">Para residentes</a>
+    <a href="#como">Cómo funciona</a>
+    <a class="btn-p" style="padding:10px 22px;font-size:14px" href="/login.html">Ingresar</a>
+  </div>
 </nav>
 
 <header class="hero">
   <div class="orb o1"></div><div class="orb o2"></div>
-  <svg class="crane" viewBox="0 0 200 230" fill="none" aria-hidden="true">
-    <rect x="88" y="42" width="9" height="188" fill="#1D2833"/>
-    <rect x="18" y="32" width="164" height="8" rx="2" fill="#FFB020"/>
-    <rect x="86" y="18" width="13" height="14" fill="#1D2833"/>
-    <line x1="92" y1="18" x2="26" y2="32" stroke="#33414F" stroke-width="2"/>
-    <line x1="92" y1="18" x2="174" y2="32" stroke="#33414F" stroke-width="2"/>
-    <rect x="22" y="40" width="20" height="15" fill="#33414F"/>
-    <g class="hook"><line x1="152" y1="40" x2="152" y2="96" stroke="#8891A0" stroke-width="2"/><rect x="143" y="96" width="18" height="13" rx="2" fill="#FFB020"/></g>
-  </svg>
   <div>
-    <span class="badge"><i></i> Control de obra en tiempo real</span>
-    <h1>Tu obra, medida <span class="hl">apartamento por apartamento</span>.</h1>
-    <p>AppControl registra avances por nivel, zona y actividad desde el celular, valida cada dato contra tus catálogos y calcula el avance real ponderado por capítulo.</p>
+    <div class="kicker">Control de avance de obra</div>
+    <h1>30 segundos por nivel.<br/><span class="hl">El avance real de la obra.</span></h1>
+    <p>Marca unidades, elige el estado y listo: AppControl convierte tu recorrido en el número que gerencia, costos y obra entienden. Incluso sin señal.</p>
     <div class="cta-row">
-      <a class="btn-p" href="/login.html">Ingresar a AppControl</a>
-      <a class="btn-s" href="#como">Cómo funciona</a>
+      <a class="btn-p cta-big" href="/login.html">Entrar al sistema →</a>
+      <a class="btn-s" href="#demo">Tocar la demo ↓</a>
     </div>
-    <ul class="ticks">
-      <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Funciona sin señal (offline-first)</li>
-      <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Avance ponderado real</li>
-      <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Grid por unidad y zona</li>
-    </ul>
+    <div class="micro">Sin papel · Sin llamadas · Tu trabajo queda firmado con fecha y usuario</div>
     <div class="stats">
       <div><b data-count="5">0</b><span>estados</span></div>
       <div><b data-count="19">0</b><span>niveles</span></div>
+      <div><b data-count="0">0</b><span>papel</span></div>
       <div><b data-count="100">0</b><span>% trazable</span></div>
     </div>
   </div>
 
-  <div class="mock rev">
-    <div class="mock-top"><span>PROYECTO P001 · TORRE T1</span><b><span data-count="38">0</span>%</b></div>
-    <div class="mbar"><i style="--w:38%"></i></div>
-    <div class="mrow"><b>ESTRUCTURA</b><span>62% · inc 33%</span></div>
-    <div class="mbar"><i style="--w:62%"></i></div>
-    <div class="mrow"><b>MAMPOSTERÍA</b><span>41% · inc 12%</span></div>
-    <div class="mbar"><i style="--w:41%"></i></div>
-    <div class="mrow"><b>CARPINTERÍA MADERA</b><span>70% · inc 10%</span></div>
-    <div class="mbar"><i style="--w:70%"></i></div>
-    <div class="mgrid">
-      <span class="chip c4">Listo</span><span class="chip c4">Listo</span><span class="chip c3">En remate</span><span class="chip c2">En curso</span><span class="chip c4">Listo</span><span class="chip c1">Replanteo</span>
-      <span class="chip c2">En curso</span><span class="chip c4">Listo</span><span class="chip c0">Sin empezar</span><span class="chip c2">En curso</span><span class="chip c4">Listo</span><span class="chip c0">Sin empezar</span>
+  <div class="demo rev" id="demo">
+    <div class="demo-top"><span>TORRE T1 · NIVELES 20–18</span><b>DEMO EN VIVO</b></div>
+    <div class="demo-hint">👆 Toca las ventanas: así se registra en obra</div>
+    <div class="tower" id="tower"></div>
+    <div class="demo-pct-row">
+      <div class="demo-pct" id="pct">0%</div>
+      <div class="demo-bar"><i id="bar"></i></div>
     </div>
-    <div class="toast t1">✅ OB-000012 · VALIDADO</div>
-    <div class="toast t2">📱 Celular → captura</div>
+    <div class="demo-cap">Cada ventana es una unidad. El % es el avance del tramo. Así se ve tu obra en el dashboard.</div>
   </div>
-
-  <svg class="skyline" viewBox="0 0 1200 240" preserveAspectRatio="none" aria-hidden="true">
-    <g fill="#0A1622">
-      <rect x="0" y="140" width="90" height="100"/><rect x="100" y="80" width="110" height="160"/><rect x="230" y="120" width="80" height="120"/><rect x="330" y="50" width="120" height="190"/><rect x="470" y="100" width="90" height="140"/><rect x="580" y="30" width="130" height="210"/><rect x="730" y="90" width="100" height="150"/><rect x="850" y="60" width="120" height="180"/><rect x="990" y="110" width="90" height="130"/><rect x="1100" y="70" width="100" height="170"/>
-    </g>
-    <g fill="#FFB020">
-      <rect class="win" x="115" y="95" width="10" height="12"/><rect class="win" x="140" y="95" width="10" height="12"/><rect class="win" x="165" y="120" width="10" height="12"/><rect class="win" x="350" y="70" width="10" height="12"/><rect class="win" x="380" y="70" width="10" height="12"/><rect class="win" x="410" y="100" width="10" height="12"/><rect class="win" x="600" y="50" width="10" height="12"/><rect class="win" x="630" y="50" width="10" height="12"/><rect class="win" x="660" y="85" width="10" height="12"/><rect class="win" x="870" y="80" width="10" height="12"/><rect class="win" x="900" y="80" width="10" height="12"/><rect class="win" x="1120" y="90" width="10" height="12"/>
-    </g>
-  </svg>
 </header>
 
-<div class="stripe"></div>
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-track" id="tick"></div>
+</div>
 
-<section class="sec" id="como">
-  <h2 class="rev">Así funciona en obra</h2>
-  <p class="sub rev">Menos planilla, más obra: el registro toma segundos y el avance se calcula solo.</p>
-  <div class="steps">
-    <div class="step rev"><div class="num">01</div><h3>Configura</h3><p>El administrador depura la base maestra: qué actividad aplica, está activa y tiene contratista. Solo eso se habilita.</p></div>
-    <div class="step rev"><div class="num">02</div><h3>Registra</h3><p>El residente marca unidades en el grid desde el celular —aunque no haya señal— y elige el estado: Sin empezar → Listo.</p></div>
-    <div class="step rev"><div class="num">03</div><h3>Decide</h3><p>El dashboard pondera actividad → capítulo → proyecto y muestra atrasos, matriz y desglose por unidad.</p></div>
+<section class="sec" id="residentes">
+  <h2 class="rev">Hecho para el recorrido, no para la oficina</h2>
+  <p class="sub rev">El residente no pelea con el sistema: lo usa caminando.</p>
+  <div class="cards">
+    <div class="card2 rev"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M2 20h20M5 20V8l7-5 7 5v12"/><path d="M9 20v-6h6v6"/></svg></div><h3>Sin señal no es excusa</h3><p>Registra en sótanos y zonas muertas. La cola local sincroniza sola cuando vuelva la señal.</p><span class="tag">Offline-first</span></div>
+    <div class="card2 rev"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="m14 17 2 2 4-4"/></svg></div><h3>Marcas varias unidades a la vez</h3><p>Selección múltiple + un estado = un solo toque para todo el nivel. En replanteo, en curso, en remate, listo.</p><span class="tag">Grid nivel × unidad</span></div>
+    <div class="card2 rev"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Tu trabajo queda firmado</h3><p>Fecha, usuario y contratista en cada registro. Historial eterno para trazabilidad y postventa.</p><span class="tag">Trazable</span></div>
   </div>
 </section>
 
-<section class="sec" style="padding-top:0">
-  <h2 class="rev">Hecho para la obra</h2>
-  <div class="feats">
-    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M2 20h20M5 20V8l7-5 7 5v12M9 20v-6h6v6"/></svg></div><h3>Grid nivel × unidad</h3><p>Apartamentos, punto fijo, sauna, turco, lobby y amenidades. Selección múltiple y estados con valor automático.</p></div>
-    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M12 3v18M5 8l7-5 7 5M5 8v8a3 3 0 0 0 6 0V8M19 8v8a3 3 0 0 1-6 0V8"/></svg></div><h3>Avance ponderado</h3><p>100% de estructura no es 100% de aseo: cada capítulo aporta según su incidencia. Cálculo determinístico.</p></div>
-    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Regla de oro</h3><p>Aplica + Activo + Contratista = Habilitado. Lo que no cumple, no aparece en el grid del residente.</p></div>
-    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg></div><h3>Offline-first</h3><p>Registra en sótanos y zonas sin cobertura: la cola local sincroniza sola al recuperar señal.</p></div>
-    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div><h3>Google Sheets = BD</h3><p>La hoja es la fuente de verdad. Histórico inmutable con contratista, fecha y usuario para postventa.</p></div>
-    <div class="feat rev"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFB020" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3>Roles reales</h3><p>ADMIN configura, RESIDENTE registra, VISUALIZADOR (gerencia/costos) analiza. Listo para multi-empresa.</p></div>
+<section class="sec" id="como" style="padding-top:0">
+  <h2 class="rev">Un solo número que todos entienden</h2>
+  <p class="sub rev">No un promedio ingenuo: avance ponderado. 100% de estructura pesa más que 100% de aseo, y el sistema lo calcula solo, determinístico, en la hoja.</p>
+  <div class="cards">
+    <div class="card2 rev"><h3 style="font-size:34px;color:var(--amber)">01</h3><p style="margin-top:8px">Configuración decide qué se puede ejecutar: aplica + activo + contratista.</p></div>
+    <div class="card2 rev"><h3 style="font-size:34px;color:var(--amber)">02</h3><p style="margin-top:8px">El grid registra qué se ejecutó y cuánto avanzó, unidad por unidad.</p></div>
+    <div class="card2 rev"><h3 style="font-size:34px;color:var(--amber)">03</h3><p style="margin-top:8px">El dashboard pondera actividad → capítulo → proyecto y muestra el atraso real.</p></div>
   </div>
 </section>
 
 <section class="band">
-  <h2 class="rev">Menos planilla. Más obra.</h2>
-  <p class="rev">Entra, registra el primer avance y mira el proyecto moverse.</p>
-  <a class="btn-p rev" href="/login.html">Ingresar ahora</a>
+  <h2 class="rev">La obra no espera.<br/>Tu avance tampoco.</h2>
+  <p class="rev">Entra, marca tu primer nivel y mira la torre iluminarse.</p>
+  <a class="btn-p cta-big rev" href="/login.html">Entrar ahora →</a>
 </section>
 
 <footer>
@@ -185,11 +164,39 @@ footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-wi
 </footer>
 
 <script>
-const io=new IntersectionObserver((es)=>es.forEach((e)=>e.isIntersecting&&e.target.classList.add("on")),{threshold:.15});
-document.querySelectorAll(".rev").forEach((el)=>io.observe(el));
-document.querySelectorAll("[data-count]").forEach((el)=>{const end=+el.dataset.count,t0=performance.now(),dur=1300;(function f(t){const p=Math.min(1,(t-t0)/dur);el.textContent=Math.round(end*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)});
-const estados=[["c0","Sin empezar"],["c1","Replanteo"],["c2","En curso"],["c3","En remate"],["c4","Listo"]];
-setInterval(()=>{const chips=document.querySelectorAll(".mgrid .chip");if(!chips.length)return;const c=chips[Math.floor(Math.random()*chips.length)];const s=estados[Math.floor(Math.random()*estados.length)];c.className="chip "+s[0];c.textContent=s[1];},1800);
+/* reveal + contadores */
+const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add("on")),{threshold:.15});
+document.querySelectorAll(".rev").forEach(el=>io.observe(el));
+document.querySelectorAll("[data-count]").forEach(el=>{const end=+el.dataset.count,t0=performance.now(),dur=1200;(function f(t){const p=Math.min(1,(t-t0)/dur);el.textContent=Math.round(end*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)});
+
+/* DEMO: torre interactiva */
+const VAL=[0,.1,.5,.8,1];
+const floors=[20,19,18];
+const tower=document.getElementById("tower");
+let cells=[];
+floors.forEach(f=>{
+  const row=document.createElement("div");row.className="floor";
+  row.innerHTML=`<span class="lbl">PISO ${f}</span>`;
+  for(let i=0;i<4;i++){
+    const w=document.createElement("button");w.className="win w0";w.dataset.v=0;w.setAttribute("aria-label","unidad");
+    w.onclick=()=>{let v=(+w.dataset.v+1)%5;w.dataset.v=v;w.className="win w"+v;paint();};
+    row.appendChild(w);cells.push(w);
+  }
+  tower.appendChild(row);
+});
+/* estado inicial vivo */
+[0,1,4,5,9,10].forEach((i,k)=>{const v=[4,3,4,2,4,1][k];cells[i].dataset.v=v;cells[i].className="win w"+v;});
+function paint(){
+  const avg=cells.reduce((s,c)=>s+VAL[+c.dataset.v],0)/cells.length;
+  document.getElementById("pct").textContent=Math.round(avg*100)+"%";
+  document.getElementById("bar").style.width=(avg*100)+"%";
+}
+paint();
+
+/* ticker de "registros en vivo" */
+const items=["🟢 <b>T1·1803</b> Enchape → Listo","🟡 <b>T1·1204</b> Muros → En curso","🟢 <b>T2·901</b> Puertas → Listo","🔵 <b>T1·2201</b> Pintura → En remate","🟢 <b>LOBBY</b> Aseo → Listo","🟠 <b>T1·502</b> Columnas → Replanteo","🟢 <b>AMENIDADES</b> Enchape → Listo","🟡 <b>T2·1503</b> Cocinas → En curso"];
+const half=items.map(i=>`<span>${i}</span>`).join("");
+document.getElementById("tick").innerHTML=half+half;
 </script>
 </body>
 </html>
