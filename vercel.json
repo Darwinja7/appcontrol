@@ -1,4 +1,4 @@
-﻿{
+{
   "rewrites": [
     { "source": "/configuracion", "destination": "/configuracion.html" },
     { "source": "/registro", "destination": "/registro.html" },
