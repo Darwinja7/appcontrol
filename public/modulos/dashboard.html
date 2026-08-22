@@ -1,57 +1,53 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Dashboard · AppControl</title>
+<title>Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/main.css"/>
-<style>.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}.kpi{border:1px solid var(--line);border-radius:14px;padding:16px;background:#0C1118}.kpi b{font-family:"Space Grotesk";font-size:26px;color:var(--amber);display:block}.kpi span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}.ins{margin:8px 0;padding:10px 14px;border-left:3px solid var(--amber);background:#0C1118;border-radius:0 10px 10px 0;font-size:13.5px;color:var(--mut)}</style>
+<style>
+body{background:transparent;padding:14px;overflow:auto;min-height:0}
+body::before{display:none}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.kpi{border:1px solid var(--line);border-radius:14px;padding:14px;background:#0C1118}
+.kpi b{font-family:"Space Grotesk";font-size:24px;color:var(--amber);display:block}
+.kpi span{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.ins{margin:8px 0;padding:10px 14px;border-left:3px solid var(--amber);background:#0C1118;border-radius:0 10px 10px 0;font-size:13px;color:var(--mut)}
+</style>
 </head>
 <body>
-<div class="wrap">
-  <div class="topbar">
-    <div class="brand"><b>App</b>Control · Dashboard</div>
-    <div><a href="/configuracion">Config</a><a href="/registro">Registro</a><a href="#" id="out">Salir</a></div>
+<div class="card" style="margin-top:0">
+  <div class="kicker">Data analysis</div>
+  <h2 style="margin:6px 0 12px;font-size:22px">Avance ponderado y decisiones</h2>
+  <div class="row">
+    <div style="flex:1"><label>Proyecto</label><select id="proyecto"></select></div>
+    <div style="flex:1"><label>Torre</label><select id="torre"></select></div>
+    <div style="flex:1"><label>Capítulo</label><select id="capitulo"></select></div>
+    <div style="flex:1"><label>Contratista</label><select id="contratista"></select></div>
   </div>
-  <div class="card">
-    <div class="kicker">Data analysis</div>
-    <h2 style="margin:6px 0 14px;font-size:24px">Avance ponderado y decisiones</h2>
-    <div class="row">
-      <div style="flex:1"><label>Proyecto</label><select id="proyecto"></select></div>
-      <div style="flex:1"><label>Torre</label><select id="torre"></select></div>
-      <div style="flex:1"><label>Capítulo</label><select id="capitulo"></select></div>
-      <div style="flex:1"><label>Contratista</label><select id="contratista"></select></div>
-    </div>
-    <div class="kpis" id="kpis"></div>
-    <div id="ins"></div>
-    <h3 style="margin:18px 0 8px">Avance por capítulo (ponderado)</h3>
-    <div id="caps"></div>
-    <h3 style="margin:18px 0 8px">Actividades con mayor atraso</h3>
-    <div id="late"></div>
-    <h3 style="margin:18px 0 8px">Matriz nivel × unidad</h3>
-    <label>Actividad</label><select id="actividad"></select>
-    <div class="gridwrap" id="box" style="margin-top:12px"></div>
-    <h3 style="margin:18px 0 8px">Detalle por unidad</h3>
-    <p style="color:var(--mut);font-size:13px">Haz clic en una unidad de la matriz para ver su desglose.</p>
-    <div id="unit"></div>
-  </div>
+  <div class="kpis" id="kpis"></div>
+  <div id="ins"></div>
+  <h3 style="margin:16px 0 8px">Avance por capítulo (ponderado)</h3>
+  <div id="caps"></div>
+  <h3 style="margin:16px 0 8px">Actividades con mayor atraso</h3>
+  <div id="late"></div>
+  <h3 style="margin:16px 0 8px">Matriz nivel × unidad</h3>
+  <label>Actividad</label><select id="actividad"></select>
+  <div class="gridwrap" id="box" style="margin-top:10px"></div>
+  <h3 style="margin:16px 0 8px">Detalle por unidad</h3>
+  <p style="color:var(--mut);font-size:12.5px">Toca una unidad de la matriz para ver su desglose.</p>
+  <div id="unit"></div>
 </div>
+<script src="/js/app.js"></script>
 <script>
-const $ = (s) => document.querySelector(s);
-async function api(p, o = {}) { const r = await fetch(p, { headers: { "Content-Type": "application/json" }, ...o }); if (r.status === 401) { location.href = "/login.html"; throw 0; } return r.json(); }
-const ESTADOS = ["Sin empezar", "En replanteo", "En curso", "En remate", "Listo"];
-const VALOR = { "Sin empezar": 0, "En replanteo": 0.1, "En curso": 0.5, "En remate": 0.8, "Listo": 1 };
 const num = (v) => { const n = parseFloat(String(v ?? "0").replace(",", ".")); return isNaN(n) ? 0 : n; };
 const hab = (r) => r.APLICA === "SI" && r.ACTIVO === "SI" && r.CONTRATISTA && r.CONTRATISTA !== "Sin asignar";
 let D = null, LAST = new Map();
-function fill(el, items, map, all) { el.innerHTML = (all ? '<option value="">Todos</option>' : '<option value="">Seleccione...</option>') + items.map((i) => `<option value="${map(i).v}">${map(i).t}</option>`).join(""); }
 async function init() {
   D = await api("/api/data");
-  LAST = new Map();
   for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); }
   fill($("#proyecto"), D.proyectos, (p) => ({ v: p.CODIGO, t: p.CODIGO }));
-  ["proyecto", "torre", "capitulo", "contratista", "actividad"].forEach((id) => $("#" + id).onchange = () => { if (id === "proyecto") { fill($("#torre"), torres(), (t) => ({ v: t, t })); } compute(); });
-  document.getElementById("out").onclick = async (e) => { e.preventDefault(); await fetch("/api/logout", { method: "POST" }); location.href = "/"; };
+  ["proyecto", "torre", "capitulo", "contratista", "actividad"].forEach((id) => $("#" + id).onchange = compute);
   compute();
 }
 function torres() { return [...new Set(D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value).map((u) => u.TORRE))]; }
@@ -65,39 +61,34 @@ function valOf(a, n, u) { const l = LAST.get(a + "|" + n + "|" + u); return l ? 
 function actAvance(a, rows) { const rs = rows.filter((r) => r.ACTIVIDAD === a); if (!rs.length) return 0; return rs.reduce((s, r) => s + valOf(a, r.NIVEL, r.UNIDAD), 0) / rs.length; }
 function compute() {
   const cfg = scopeCfg();
+  fill($("#torre"), torres(), (t) => ({ v: t, t }), true);
   fill($("#capitulo"), D.capitulos.filter((c) => c.PROYECTO === $("#proyecto").value), (c) => ({ v: c.CODIGO, t: c.NOMBRE }), true);
   fill($("#contratista"), D.contratistas, (c) => ({ v: c.CODIGO, t: c.NOMBRE }), true);
   fill($("#actividad"), [...new Set(cfg.map((r) => r.ACTIVIDAD))].map((a) => ({ a })), (x) => ({ v: x.a, t: x.a }), false);
-  // avance por actividad y ponderado
-  const acts = D.actividades.filter((a) => a.PROYECTO === $("#proyecto").value || true);
   let general = 0; const caps = [];
   for (const cap of D.capitulos.filter((c) => c.PROYECTO === $("#proyecto").value)) {
     let capAv = 0;
-    const as = acts.filter((a) => a.CAPITULO === cap.CODIGO && cfg.some((r) => r.ACTIVIDAD === a.CODIGO));
+    const as = D.actividades.filter((a) => a.CAPITULO === cap.CODIGO && cfg.some((r) => r.ACTIVIDAD === a.CODIGO));
     for (const a of as) capAv += actAvance(a.CODIGO, cfg) * num(a.PONDERACION);
     const capPct = Math.min(100, capAv * 100);
     general += (capPct / 100) * num(cap.PONDERACION);
     caps.push({ ...cap, avance: capPct });
   }
   general = Math.min(100, general * 100);
-  // KPIs
-  const listoPct = cfg.length ? Math.round((cfg.filter((r) => (LAST.get(r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD)?.ESTADO) === "Listo").length / cfg.length) * 100) : 0;
+  const listoPct = cfg.length ? Math.round((cfg.filter((r) => (LAST.get(r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD) || {}).ESTADO === "Listo").length / cfg.length) * 100) : 0;
   const semana = D.registro.filter((r) => new Date(r.FECHA) > new Date(Date.now() - 7 * 864e5)).length;
-  $("#kpis").innerHTML = `
-    <div class='kpi'><b>${general.toFixed(1)}%</b><span>Avance proyecto</span></div>
-    <div class='kpi'><b>${cfg.length}</b><span>Unidades habilitadas</span></div>
-    <div class='kpi'><b>${listoPct}%</b><span>Unidades listas</span></div>
-    <div class='kpi'><b>${semana}</b><span>Registros 7 días</span></div>`;
-  // capítulos
+  $("#kpis").innerHTML =
+    `<div class='kpi'><b>${general.toFixed(1)}%</b><span>Avance proyecto</span></div>
+     <div class='kpi'><b>${cfg.length}</b><span>Unidades habilitadas</span></div>
+     <div class='kpi'><b>${listoPct}%</b><span>Unidades listas</span></div>
+     <div class='kpi'><b>${semana}</b><span>Registros 7 días</span></div>`;
   $("#caps").innerHTML = caps.map((c) => `<div class='cap'><h3><span>${c.NOMBRE}</span><span>${c.avance.toFixed(1)}% · pond ${(num(c.PONDERACION) * 100).toFixed(0)}%</span></h3><div class='bar'><i style='width:${c.avance}%'></i></div></div>`).join("");
-  // atrasadas
   const late = [...new Set(cfg.map((r) => r.ACTIVIDAD))].map((a) => ({ a, av: actAvance(a, cfg) })).sort((x, y) => x.av - y.av).slice(0, 5);
   $("#late").innerHTML = late.map((l) => `<div class='cap'><h3><span>${l.a}</span><span>${(l.av * 100).toFixed(0)}%</span></h3><div class='bar'><i style='width:${l.av * 100}%'></i></div></div>`).join("") || "<p class='msg'>Sin datos.</p>";
-  // insights
   const ins = [];
-  const worst = late[0]; if (worst && worst.av < 0.4) ins.push(`⚠️ ${worst.a} es la actividad más atrasada (${(worst.av * 100).toFixed(0)}%).`);
-  const best = caps.slice().sort((a, b) => b.avance - a.avance)[0]; if (best) ins.push(`✅ ${best.NOMBRE} lidera el avance con ${best.avance.toFixed(0)}%.`);
-  if (general > 0 && general < 30) ins.push("🕐 El proyecto está en etapa temprana: prioriza habilitar contratistas en Configuración.");
+  if (late[0] && late[0].av < 0.4) ins.push("Atención: " + late[0].a + " es la más atrasada (" + (late[0].av * 100).toFixed(0) + "%).");
+  const best = caps.slice().sort((a, b) => b.avance - a.avance)[0]; if (best && best.avance > 0) ins.push("Lidera: " + best.NOMBRE + " con " + best.avance.toFixed(0) + "%.");
+  if (general > 0 && general < 30) ins.push("Etapa temprana: prioriza habilitar contratistas en Configuración.");
   $("#ins").innerHTML = ins.map((i) => `<div class='ins'>${i}</div>`).join("");
   renderMatrix(cfg);
 }
@@ -114,7 +105,7 @@ function renderMatrix(cfg) {
       if (!cells.some((r) => r.NIVEL === n && r.UNIDAD === u)) { html += "<td></td>"; continue; }
       const l = LAST.get(a + "|" + n + "|" + u);
       const est = l ? l.ESTADO : "Sin empezar";
-      html += `<td><span class='chip st${ESTADOS.indexOf(est)}' style='cursor:pointer' data-u='${u}'>${est}</span></td>`;
+      html += `<td><span class='chip st${ESTADOS.indexOf(est)}' style='cursor:pointer' data-u='${u}'>${est.substring(0, 3)}</span></td>`;
     }
     html += "</tr>";
   }
@@ -123,7 +114,7 @@ function renderMatrix(cfg) {
 }
 function showUnit(u, cfg) {
   const rows = cfg.filter((r) => r.UNIDAD === u);
-  $("#unit").innerHTML = `<h3 style='margin:10px 0'>UNIDAD ${u}</h3>` + rows.map((r) => {
+  $("#unit").innerHTML = "<h3 style='margin:10px 0'>UNIDAD " + u + "</h3>" + rows.map((r) => {
     const v = valOf(r.ACTIVIDAD, r.NIVEL, r.UNIDAD) * 100;
     return `<div class='cap'><h3><span>${r.ACTIVIDAD}</span><span>${v.toFixed(0)}%</span></h3><div class='bar'><i style='width:${v}%'></i></div></div>`;
   }).join("");

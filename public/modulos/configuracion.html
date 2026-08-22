@@ -1,11 +1,13 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Configuración · AppControl</title>
+<title>Configuración</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/main.css"/>
 <style>
+body{background:transparent;padding:14px;overflow:auto;min-height:0}
+body::before{display:none}
 .c0{background:#2A3138;color:#8891A0}.c1{background:#6E5620;color:#F4E5BE}.c2{background:#245C43;color:#D5EFE2}
 .cellbtn{min-width:44px;padding:8px 6px;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:700}
 .selring{outline:2px solid var(--amber);outline-offset:2px}
@@ -17,52 +19,46 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="topbar">
-    <div class="brand"><b>App</b>Control · Configuración</div>
-    <div><a href="/registro">Registro</a><a href="/dashboard">Dashboard</a><a href="#" id="out">Salir</a></div>
+<div class="card" style="margin-top:0">
+  <div class="kicker">Capa de control</div>
+  <h2 style="margin:6px 0 4px;font-size:22px">Base depurada: qué se puede ejecutar</h2>
+  <p style="color:var(--mut);font-size:13px">HABILITADO = APLICA Sí + ACTIVO Sí + CONTRATISTA asignado. Solo lo habilitado aparece en el Grid.</p>
+  <label>Proyecto</label><select id="proyecto"></select>
+  <label>Torre</label><select id="torre"></select>
+  <label>Actividad</label><select id="actividad"></select>
+  <div class="legend">
+    <span><i style="background:#2A3138"></i>No aplica / sin configurar</span>
+    <span><i style="background:#6E5620"></i>Aplica, no habilitado</span>
+    <span><i style="background:#245C43"></i>Habilitado</span>
+    <span>· clic = seleccionar varias celdas</span>
   </div>
-  <div class="card">
-    <div class="kicker">Capa de control</div>
-    <h2 style="margin:6px 0 4px;font-size:24px">Base depurada: qué se puede ejecutar</h2>
-    <p style="color:var(--mut);font-size:13.5px">HABILITADO = APLICA Sí + ACTIVO Sí + CONTRATISTA asignado. Solo lo habilitado aparece en el Grid del residente.</p>
-    <label>Proyecto</label><select id="proyecto"></select>
-    <label>Torre</label><select id="torre"></select>
-    <label>Actividad</label><select id="actividad"></select>
-    <div class="legend">
-      <span><i style="background:#2A3138"></i>No aplica / sin configurar</span>
-      <span><i style="background:#6E5620"></i>Aplica, no habilitado</span>
-      <span><i style="background:#245C43"></i>Habilitado para registro</span>
-      <span>· clic en celdas = seleccionar varias</span>
-    </div>
-    <div class="actions">
-      <button class="btn secondary" id="aSi">Aplica = Sí</button>
-      <button class="btn secondary" id="aNo">Aplica = No</button>
-      <button class="btn secondary" id="vSi">Activo = Sí</button>
-      <button class="btn secondary" id="vNo">Activo = No</button>
-      <select id="contratista"></select>
-      <button class="btn secondary" id="aCt">Asignar contratista</button>
-      <button class="btn" id="save">💾 Guardar cambios</button>
-    </div>
-    <div class="gridwrap" id="box"></div>
-    <div class="msg" id="m"></div>
+  <div class="actions">
+    <button class="btn secondary" id="aSi">Aplica = Sí</button>
+    <button class="btn secondary" id="aNo">Aplica = No</button>
+    <button class="btn secondary" id="vSi">Activo = Sí</button>
+    <button class="btn secondary" id="vNo">Activo = No</button>
+    <select id="contratista"></select>
+    <button class="btn secondary" id="aCt">Asignar contratista</button>
+    <button class="btn" id="save">Guardar cambios</button>
   </div>
+  <div class="gridwrap" id="box"></div>
+  <div class="msg" id="m"></div>
 </div>
+<script src="/js/app.js"></script>
 <script>
-const $ = (s) => document.querySelector(s);
-async function api(p, o = {}) { const r = await fetch(p, { headers: { "Content-Type": "application/json" }, ...o }); if (r.status === 401) { location.href = "/login.html"; throw 0; } return r.json(); }
 let D = null, CFG = [], sel = new Set();
 const hoy = () => new Date().toISOString().slice(0, 10);
 const hab = (r) => r.APLICA === "SI" && r.ACTIVO === "SI" && r.CONTRATISTA && r.CONTRATISTA !== "Sin asignar";
-const key = (t, a, n, u) => t + "|" + a + "|" + n + "|" + u;
+const key = (t, a, n, u) => [t, a, n, u].join("|");
 const findRow = (t, a, n, u) => CFG.find((r) => key(r.TORRE, r.ACTIVIDAD, r.NIVEL, r.UNIDAD) === key(t, a, n, u));
 async function init() {
   D = await api("/api/data");
   if (D.me.rol !== "ADMIN") { document.querySelector(".card").innerHTML = "<p class='msg err'>Solo el rol ADMIN puede configurar.</p>"; return; }
-  fill($("#proyecto"), D.proyectos, (p) => ({ v: p.CODIGO, t: p.CODIGO + " — " + p.NOMBRE }));
+  CFG = D.configuracion.map((r) => ({ ...r }));
+  fill($("#proyecto"), D.proyectos, (p) => ({ v: p.CODIGO, t: p.CODIGO + " - " + p.NOMBRE }));
   fill($("#contratista"), D.contratistas, (c) => ({ v: c.CODIGO, t: c.NOMBRE }));
   $("#proyecto").onchange = () => { fill($("#torre"), torres(), (t) => ({ v: t, t })); reset(); };
-  $("#torre").onchange = () => { fill($("#actividad"), D.actividades, (a) => ({ v: a.CODIGO, t: a.CODIGO + " — " + a.NOMBRE })); reset(); };
+  $("#torre").onchange = () => { fill($("#actividad"), D.actividades, (a) => ({ v: a.CODIGO, t: a.CODIGO + " - " + a.NOMBRE })); reset(); };
   $("#actividad").onchange = render;
   $("#aSi").onclick = () => bulk((r) => { r.APLICA = "SI"; });
   $("#aNo").onclick = () => bulk((r) => { r.APLICA = "NO"; });
@@ -75,9 +71,7 @@ async function init() {
     $("#m").className = "msg " + (d.success ? "ok" : "err");
     render();
   };
-  document.getElementById("out").onclick = async (e) => { e.preventDefault(); await fetch("/api/logout", { method: "POST" }); location.href = "/"; };
 }
-function fill(selEl, items, map) { selEl.innerHTML = '<option value="">Seleccione...</option>' + items.map((i) => `<option value="${map(i).v}">${map(i).t}</option>`).join(""); }
 function torres() { return [...new Set(D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value).map((u) => u.TORRE))]; }
 function reset() { sel.clear(); $("#actividad").innerHTML = ""; $("#box").innerHTML = ""; }
 function getRow(t, a, n, u) {
@@ -102,7 +96,7 @@ function render() {
       const cls = !r || r.APLICA !== "SI" ? "c0" : hab(r) ? "c2" : "c1";
       const txt = !r || r.APLICA !== "SI" ? "·" : hab(r) ? "HAB" : "APL";
       const k = key(t, a, n, u);
-      html += `<td><button class='cellbtn ${cls} ${sel.has(k) ? "selring" : ""}' data-k='${k}' data-t='${t}' data-a='${a}' data-n='${n}' data-u='${u}'>${txt}</button></td>`;
+      html += `<td><button class='cellbtn ${cls} ${sel.has(k) ? "selring" : ""}' data-k='${k}'>${txt}</button></td>`;
     }
     html += "</tr>";
   }

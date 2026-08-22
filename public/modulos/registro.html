@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<title>Registro</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+body{background:transparent;padding:14px;overflow:auto;min-height:0}
+body::before{display:none}
+label.cell{display:inline-flex;flex-direction:column;gap:3px;align-items:center;cursor:pointer}
+label.cell input{width:auto;accent-color:var(--amber)}
+.sel-count{background:var(--amber);color:#000;padding:2px 8px;border-radius:10px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="card" style="margin-top:0">
+  <div class="kicker">Registro de avance</div>
+  <label>Actividad (solo habilitadas)</label><select id="actividad"></select>
+  <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+    <span style="color:var(--mut);font-size:13px">Marca unidades y elige estado</span>
+    <span id="sel-badge" class="sel-count" style="display:none">0</span>
+  </div>
+</div>
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="gridwrap" id="box"></div>
+</div>
+<div style="position:sticky;bottom:0;padding:10px 0;z-index:50">
+  <div style="display:flex;gap:10px">
+    <select id="estado" style="flex:1;margin:0"></select>
+    <button class="btn" id="save" style="flex:1;margin:0;width:auto">Guardar</button>
+  </div>
+</div>
+<script src="/js/app.js"></script>
+<script>
+let D = null, LAST = new Map(), SEL = new Set();
+async function init() {
+  D = await api("/api/data");
+  rebuildLast();
+  const acts = [...new Set(cfgHab().map((r) => r.ACTIVIDAD))];
+  fill($("#actividad"), acts.map((a) => ({ CODIGO: a })), (x) => ({ v: x.CODIGO, t: x.CODIGO }));
+  fill($("#estado"), ESTADOS, (e) => ({ v: e, t: e }));
+  $("#actividad").onchange = () => { SEL.clear(); render(); };
+  $("#save").onclick = guardar;
+  if (acts.length) { $("#actividad").value = acts[0]; render(); }
+}
+function rebuildLast() { LAST = new Map(); for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); } }
+function cfgHab() { return D.configuracion.filter((r) => r.APLICA === "SI" && r.ACTIVO === "SI" && r.CONTRATISTA && r.CONTRATISTA !== "Sin asignar"); }
+function render() {
+  const a = $("#actividad").value; if (!a) return;
+  const cells = cfgHab().filter((r) => r.ACTIVIDAD === a);
+  const niveles = [...new Set(cells.map((r) => r.NIVEL))].sort((x, y) => +x - +y);
+  const cols = [...new Set(cells.map((r) => r.UNIDAD))].sort();
+  let html = "<table class='grid'><tr><th>NIVEL</th><th>AV.</th>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
+  for (const n of niveles) {
+    const vals = []; let tds = "";
+    for (const u of cols) {
+      const c = cells.find((r) => r.NIVEL === n && r.UNIDAD === u);
+      if (!c) { tds += "<td></td>"; continue; }
+      const last = LAST.get(a + "|" + n + "|" + u);
+      const st = last ? last.ESTADO : "Sin empezar";
+      vals.push(VALOR[st] ?? 0);
+      const k = n + "|" + u;
+      tds += `<td><label class='cell'><input type='checkbox' ${SEL.has(k) ? "checked" : ""} data-k='${k}'/><span class='chip st${ESTADOS.indexOf(st)}'>${st.substring(0, 3)}</span></label></td>`;
+    }
+    const avg = vals.length ? Math.round((vals.reduce((x, y) => x + y, 0) / vals.length) * 100) : 0;
+    html += `<tr><td class='lvl'>${n}</td><td class='av'>${avg}%</td>` + tds + "</tr>";
+  }
+  html += "</table>";
+  $("#box").innerHTML = html;
+  $("#box").querySelectorAll("input[type=checkbox]").forEach((c) => c.onchange = () => { c.checked ? SEL.add(c.dataset.k) : SEL.delete(c.dataset.k); updateBadge(); });
+  updateBadge();
+}
+function updateBadge() { const b = $("#sel-badge"); if (SEL.size) { b.style.display = "inline-block"; b.textContent = SEL.size; } else b.style.display = "none"; }
+async function guardar() {
+  const a = $("#actividad").value, est = $("#estado").value;
+  if (!a || !est || !SEL.size) { alert("Selecciona actividad, estado y al menos una unidad."); return; }
+  const sample = cfgHab().find((r) => r.ACTIVIDAD === a);
+  const items = [...SEL].map((k) => { const [n, u] = k.split("|"); return { proyecto: sample.PROYECTO, torre: sample.TORRE, actividad: a, nivel: n, unidad: u, estado: est }; });
+  const btn = $("#save"); btn.disabled = true; btn.textContent = "...";
+  const d = await api("/api/registro-save", { method: "POST", body: JSON.stringify({ items }) });
+  btn.disabled = false; btn.textContent = "Guardar";
+  if (d.success) {
+    alert(d.offline ? "Guardado offline. Se sincronizará al haber señal." : "Registrado correctamente (" + d.registrados + ").");
+    SEL.clear();
+    D = await api("/api/data"); rebuildLast(); render();
+  }
+}
+init();
+</script>
+</body>
+</html>

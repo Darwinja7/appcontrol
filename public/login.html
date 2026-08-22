@@ -41,9 +41,10 @@ document.getElementById('f').addEventListener('submit', async (e) => {
   const m = document.getElementById('m'); m.textContent = ''; m.className = 'msg';
   const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario: document.getElementById('u').value, pin: document.getElementById('p').value }) });
   const d = await r.json();
-  if (d.success) location.href = '/registro';
+  if (d.success) location.href = '/app.html';
   else { m.textContent = 'Credenciales inválidas'; m.className = 'msg err'; }
 });
 </script>
 </body>
 </html>
+

@@ -1,8 +1,9 @@
 {
   "rewrites": [
-    { "source": "/configuracion", "destination": "/configuracion.html" },
-    { "source": "/registro", "destination": "/registro.html" },
-    { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/login", "destination": "/login.html" }
+    { "source": "/app", "destination": "/app.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/configuracion", "destination": "/app.html" },
+    { "source": "/registro", "destination": "/app.html" },
+    { "source": "/dashboard", "destination": "/app.html" }
   ]
 }

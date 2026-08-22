@@ -1,0 +1,125 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AppControl ERP</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/erp.css"/>
+</head>
+<body>
+
+<!-- SIDEBAR (Estilo SINCO) -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand-area">
+    <div class="logo">App<b>Control</b></div>
+    <div class="project-sel">PROYECTO ACTIVO ▼</div>
+  </div>
+  
+  <nav class="menu">
+    <div class="menu-group">OPERACIÓN</div>
+    <a href="#" class="menu-item active" data-mod="registro">📝 Registro de Avance</a>
+    <a href="#" class="menu-item" data-mod="dashboard">📊 Dashboard / KPIs</a>
+    
+    <div class="menu-group" id="admin-group" style="display:none">ADMINISTRACIÓN</div>
+    <a href="#" class="menu-item admin-only" data-mod="configuracion" style="display:none">⚙️ Configuración</a>
+    
+    <!-- Espacio para futuros módulos -->
+    <div class="menu-group future">FUTURO</div>
+    <a href="#" class="menu-item disabled">📦 Entregas (Próximamente)</a>
+    <a href="#" class="menu-item disabled">🛠️ Postventa (Próximamente)</a>
+  </nav>
+
+  <div class="user-area">
+    <div class="user-info">
+      <span id="user-name">Cargando...</span>
+      <span id="user-role" class="role-badge">...</span>
+    </div>
+    <button id="btn-logout" class="btn-icon">🚪</button>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="main-content">
+  <header class="topbar-mobile">
+    <button id="toggle-menu" class="btn-icon">☰</button>
+    <span class="page-title" id="page-title">Registro</span>
+  </header>
+  
+  <!-- Aquí se inyectan los módulos -->
+  <iframe id="module-frame" src="/modulos/registro.html" frameborder="0"></iframe>
+</main>
+
+<!-- OFFLINE BADGE GLOBAL -->
+<div id="offline-badge"></div>
+
+<script src="/js/app.js"></script>
+<script>
+  // --- LÓGICA DEL SHELL ---
+  const frame = document.getElementById("module-frame");
+  const title = document.getElementById("page-title");
+  
+  // 1. Verificar sesión y roles
+  async function checkAuth() {
+    try {
+      const res = await fetch("/api/me");
+      const data = await res.json();
+      if (!data.success) throw 0;
+      
+      document.getElementById("user-name").textContent = data.usuario.nombre;
+      document.getElementById("user-role").textContent = data.usuario.rol;
+      
+      // Control de acceso por rol
+      if (data.usuario.rol === "ADMIN") {
+        document.getElementById("admin-group").style.display = "block";
+        document.querySelectorAll(".admin-only").forEach(el => el.style.display = "flex");
+      } else if (data.usuario.rol === "VISUALIZADOR") {
+        // Visualizadores no pueden registrar, redirigir a dashboard
+        loadModule("dashboard");
+        document.querySelector('[data-mod="registro"]').style.display = "none";
+      }
+      
+      initApp(); // Iniciar lógica offline global
+    } catch (e) {
+      location.href = "/login.html";
+    }
+  }
+
+  // 2. Navegación SPA (Single Page Application)
+  function loadModule(modName) {
+    // Actualizar iframe
+    frame.src = `/modulos/${modName}.html`;
+    
+    // Actualizar título
+    const names = { "registro": "Registro de Avance", "dashboard": "Dashboard", "configuracion": "Configuración" };
+    title.textContent = names[modName] || modName;
+    
+    // Actualizar menú activo
+    document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("active"));
+    const activeLink = document.querySelector(`[data-mod="${modName}"]`);
+    if(activeLink) activeLink.classList.add("active");
+    
+    // Cerrar menú en móvil
+    if(window.innerWidth <= 768) document.getElementById("sidebar").classList.remove("open");
+  }
+
+  // Event Listeners
+  document.querySelectorAll(".menu-item:not(.disabled)").forEach(item => {
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      loadModule(item.dataset.mod);
+    });
+  });
+
+  document.getElementById("btn-logout").onclick = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    location.href = "/";
+  };
+
+  document.getElementById("toggle-menu").onclick = () => {
+    document.getElementById("sidebar").classList.toggle("open");
+  };
+
+  checkAuth();
+</script>
+</body>
+</html>
