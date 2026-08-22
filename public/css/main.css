@@ -51,3 +51,32 @@ table.grid td.lvl{background:#0C1118;color:var(--amber);font-weight:700;text-ali
 .counts b{color:var(--amber)}
 pre{background:#0C1118;border:1px solid var(--line);padding:12px;border-radius:12px;margin:12px 0;font-size:12.5px;color:var(--mut);overflow:auto}
 @media(max-width:640px){.card{padding:20px}.big{font-size:44px}}
+
+/* --- MOBILE FIRST OVERRIDES --- */
+@media (max-width: 768px) {
+  .wrap { padding: 0 12px; }
+  .card { padding: 16px; margin: 12px 0; border-radius: 16px; }
+  .topbar { padding: 12px 0; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .topbar > div { width: 100%; justify-content: space-between; }
+  
+  /* Grid Scroll Horizontal para Tablas Grandes */
+  .gridwrap { 
+    margin: 0 -16px; 
+    padding: 0 16px; 
+    border: none; 
+    border-radius: 0;
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+  }
+  table.grid th, table.grid td { padding: 8px 6px; font-size: 12px; min-width: 50px; }
+  table.grid th:first-child, table.grid td.lvl { position: sticky; left: 0; z-index: 2; background: #0C1118; box-shadow: 2px 0 5px rgba(0,0,0,0.3); }
+  
+  /* Botones y Inputs más grandes para dedos */
+  .btn { padding: 16px; font-size: 16px; }
+  input, select { padding: 14px; font-size: 16px; } /* 16px evita zoom automático en iPhone */
+  
+  /* Chips de estado */
+  .chip { padding: 6px 4px; font-size: 10px; min-width: 40px; display: inline-block; text-align: center; }
+  
+  /* KPIs en Dashboard */
+  .kpis { grid-template-columns: 1fr 1fr; }
+}
