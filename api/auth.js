@@ -114,7 +114,7 @@ export default async function handler(req, res) {
       usuarios[idx] = { ...usuarios[idx], RESET_PIN_HASH: sha256Hex(pin), RESET_PIN_EXPIRES: expires };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")));
       const mail = await sendResetPin({ to: usuarios[idx].EMAIL, pin, nombre: usuarios[idx].NOMBRE });
-      return res.json({ success: true, sent: mail.sent, devPin: process.env.ALLOW_DEV_PIN === "SI" ? pin : undefined });
+      const showPin = process.env.ALLOW_DEV_PIN === "SI" || !mail.sent; return res.json({ success: true, sent: mail.sent, devPin: showPin ? pin : undefined });
     }
 
     if (a === "forgot-confirm") {
