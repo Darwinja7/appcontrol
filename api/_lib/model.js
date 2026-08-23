@@ -16,6 +16,7 @@ export const HEADERS = {
     "MUST_CHANGE_PASSWORD",
     "ACCESS_CODE_HASH",
     "RESET_PIN_HASH",
+    "RESET_PIN",
     "RESET_PIN_EXPIRES",
     "ACTIVO"
   ],

@@ -9,7 +9,6 @@ import {
   currentUser, bootstrapOk, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD,
   SYNTH_EMPRESAS, SYNTH_PROYECTOS
 } from "./_lib/session.js";
-import { sendResetPin } from "./_lib/mail.js";
 
 const ROLES_VALIDOS = ["ADMIN", "RESIDENTE", "VISUALIZADOR"];
 
@@ -113,7 +112,7 @@ export default async function handler(req, res) {
       if (idx < 0) return res.status(404).json({ success: false, codigo: "USUARIO_NO_EXISTE" });
       if (!verifyPassword(currentPassword, usuarios[idx].PASSWORD_HASH))
         return res.status(401).json({ success: false, codigo: "PASSWORD_ACTUAL_INVALIDA" });
-      usuarios[idx] = { ...usuarios[idx], PASSWORD_HASH: hashPassword(newPassword), MUST_CHANGE_PASSWORD: "NO", RESET_PIN_HASH: "", RESET_PIN_EXPIRES: "" };
+      usuarios[idx] = { ...usuarios[idx], PASSWORD_HASH: hashPassword(newPassword), MUST_CHANGE_PASSWORD: "NO", RESET_PIN_HASH: "", RESET_PIN: "", RESET_PIN_EXPIRES: "" };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
       setSession(res, usuarios[idx].EMAIL, empresa, proyecto, usuarios[idx].ROL);
       return res.json({ success: true });
@@ -131,14 +130,31 @@ export default async function handler(req, res) {
       );
       if (idx < 0) return res.json({ success: true });
       const pin = resetPin();
-      const expires = new Date(Date.now() + 2 * 60 * 1000).toISOString();
-      usuarios[idx] = { ...usuarios[idx], RESET_PIN_HASH: sha256Hex(pin), RESET_PIN_EXPIRES: expires };
+      const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      usuarios[idx] = { ...usuarios[idx], RESET_PIN_HASH: sha256Hex(pin), RESET_PIN: pin, RESET_PIN_EXPIRES: expires };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
-      const mail = await sendResetPin({ to: usuarios[idx].EMAIL, pin, nombre: usuarios[idx].NOMBRE });
-      // El PIN JAMÁS viaja en la respuesta salvo que ALLOW_DEV_PIN=SI esté
-      // definido explícitamente en el entorno (entornos de desarrollo only).
+      // El PIN no viaja en la respuesta: queda visible solo para ADMIN en el
+      // modulo de usuarios (accion "reset-pins"), quien lo comparte con el
+      // usuario por el canal que prefiera. En desarrollo se permite verlo con
+      // ALLOW_DEV_PIN=SI.
       const showPin = process.env.ALLOW_DEV_PIN === "SI";
-      return res.json({ success: true, sent: mail.sent, devPin: showPin ? pin : undefined });
+      return res.json({ success: true, devPin: showPin ? pin : undefined });
+    }
+
+    // Lista de PINs de recuperacion pendientes (vigentes) para este proyecto.
+    // Solo ADMIN; cualquier admin actual los ve porque se leen de la hoja.
+    if (a === "reset-pins") {
+      const c = await currentUser(req);
+      if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      if (!limitar(`reset-pins:${c.u.EMAIL}`, 30, 60_000))
+        return res.status(429).json({ success: false, codigo: "DEMASIADOS_INTENTOS" });
+      const usuarios = await readRows("USUARIOS");
+      const ahora = Date.now();
+      const pendientes = usuarios
+        .filter((u) => u.EMPRESA === c.u.EMPRESA && u.PROYECTO === c.u.PROYECTO && u.RESET_PIN && u.RESET_PIN_EXPIRES)
+        .filter((u) => ahora <= new Date(u.RESET_PIN_EXPIRES).getTime())
+        .map((u) => ({ NOMBRE: u.NOMBRE, EMAIL: u.EMAIL, ROL: u.ROL, PIN: u.RESET_PIN, EXPIRA: u.RESET_PIN_EXPIRES }));
+      return res.json({ success: true, pendientes });
     }
 
     if (a === "forgot-confirm") {
@@ -157,7 +173,7 @@ export default async function handler(req, res) {
       if (!u.RESET_PIN_HASH || !u.RESET_PIN_EXPIRES) return res.status(401).json({ success: false, codigo: "PIN_INVALIDO" });
       if (Date.now() > new Date(u.RESET_PIN_EXPIRES).getTime()) return res.status(401).json({ success: false, codigo: "PIN_EXPIRADO" });
       if (!safeCompare(u.RESET_PIN_HASH, sha256Hex(pin))) return res.status(401).json({ success: false, codigo: "PIN_INVALIDO" });
-      usuarios[idx] = { ...u, PASSWORD_HASH: hashPassword(newPassword), MUST_CHANGE_PASSWORD: "NO", RESET_PIN_HASH: "", RESET_PIN_EXPIRES: "" };
+      usuarios[idx] = { ...u, PASSWORD_HASH: hashPassword(newPassword), MUST_CHANGE_PASSWORD: "NO", RESET_PIN_HASH: "", RESET_PIN: "", RESET_PIN_EXPIRES: "" };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
       return res.json({ success: true });
     }
@@ -188,7 +204,7 @@ export default async function handler(req, res) {
           EMPRESA: c.u.EMPRESA, PROYECTO: c.u.PROYECTO, TORRE: torre,
           SENDER_ID: String(email).toLowerCase(), PASSWORD_HASH: hashPassword(tempPass),
           MUST_CHANGE_PASSWORD: "SI", ACCESS_CODE_HASH: sha256Hex(accessCode),
-          RESET_PIN_HASH: "", RESET_PIN_EXPIRES: "", ACTIVO: "SI"
+          RESET_PIN_HASH: "", RESET_PIN: "", RESET_PIN_EXPIRES: "", ACTIVO: "SI"
         });
         await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
         return res.json({ success: true, usuario: { id, nombre, email, rol, torre, passwordInicial: tempPass, accessCode } });

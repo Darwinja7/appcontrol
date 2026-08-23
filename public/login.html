@@ -99,10 +99,10 @@ input:focus,select:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0
 
     <div id="forgotPanel" class="panel">
       <h1>Recuperar acceso</h1>
-      <p class="sub">Solicita un PIN temporal y define tu nueva contraseña.</p>
+      <p class="sub">Solicita un PIN temporal, pídelo a tu administrador y define tu nueva contraseña.</p>
       <div class="steps">
         <div class="step"><b>1</b> Solicita el PIN con tu empresa, proyecto y correo.</div>
-        <div class="step"><b>2</b> Recíbelo (correo o en pantalla) y úsalo dentro de 2 minutos.</div>
+        <div class="step"><b>2</b> Por seguridad, el PIN llega al administrador del proyecto; comunícate con él para obtenerlo.</div>
         <div class="step"><b>3</b> Escribe y confirma tu nueva contraseña.</div>
       </div>
       <label for="fEmpresa">Empresa</label>
@@ -111,7 +111,7 @@ input:focus,select:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0
       <select id="fProyecto"></select>
       <label for="fEmail">Correo</label>
       <input id="fEmail" type="email" placeholder="tucorreo@empresa.com"/>
-      <button class="btn" id="sendPinBtn">Enviar PIN</button>
+      <button class="btn" id="sendPinBtn">Solicitar PIN</button>
       <div id="pinStatus" class="msg"></div>
 
       <label for="pin">PIN recibido <span id="countdown" class="count"></span></label>
@@ -211,12 +211,11 @@ $("#sendPinBtn").onclick = async () => {
   $("#sendPinBtn").disabled = true; $("#sendPinBtn").textContent = "Emitiendo...";
   const r = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "forgot-start", empresa: $("#fEmpresa").value, proyecto: $("#fProyecto").value, email: $("#fEmail").value.trim() }) });
   const d = await r.json();
-  $("#sendPinBtn").textContent = "Enviar PIN";
+  $("#sendPinBtn").textContent = "Solicitar PIN";
   if (d.success) {
-    if (d.sent) msg($("#pinStatus"), "PIN enviado. Revisa tu correo.", "ok");
-    else if (d.devPin) msg($("#pinStatus"), "Entorno de desarrollo: tu PIN es: " + d.devPin, "ok");
-    else msg($("#pinStatus"), "PIN emitido. El envío por correo falló; contacta al administrador de la plataforma.", "err");
-    startCountdown(120);
+    if (d.devPin) msg($("#pinStatus"), "Entorno de desarrollo: tu PIN es: " + d.devPin, "ok");
+    else msg($("#pinStatus"), "PIN emitido. Por seguridad llegó al administrador de tu proyecto: comunícate con él para obtenerlo.", "ok");
+    startCountdown(15 * 60);
   } else msg($("#pinStatus"), "No fue posible emitir el PIN.");
 };
 

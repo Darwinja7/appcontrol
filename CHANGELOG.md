@@ -2,6 +2,14 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado: semver.
 
+## [1.6.0] - 2026-08-23
+### Changed
+- Recuperación de contraseña sin correo: el PIN ya no se envía por email (no se requieren Resend ni dominio propio). El PIN queda visible en el módulo Usuarios para cualquier ADMIN del proyecto, quien lo comparte directamente con el usuario.
+- PIN de recuperación vigente por 15 minutos (antes 2) para dar margen a la comunicación con el administrador.
+### Added
+- Acción `reset-pins` en `/api/auth` (solo ADMIN, aislada por empresa/proyecto) y panel de "PINs de recuperación pendientes" con auto-refresco cada 25 s.
+- Columna `RESET_PIN` en USUARIOS (se crea sola en la siguiente escritura; se limpia al usar el PIN o cambiar la contraseña).
+
 ## [1.5.0] - 2026-08-22
 ### Security
 - Bootstrap admin desactivado por defecto: requiere `ENABLE_BOOTSTRAP=SI` más `BOOTSTRAP_EMAIL`/`BOOTSTRAP_PASSWORD` por variables de entorno (nunca en código).
