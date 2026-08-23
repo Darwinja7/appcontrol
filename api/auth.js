@@ -12,6 +12,7 @@ import {
 import { cifrarLlave, mascararLlave } from "./_lib/crypto-llm.js";
 import { resolverProveedor } from "./_lib/llm-providers.js";
 import { resolverLlm, chatLlm, promptSistema, parseRespuestaLlm } from "./_lib/llm.js";
+import { sendResetPin } from "./_lib/mail.js";
 
 const ROLES_VALIDOS = ["ADMIN", "RESIDENTE", "VISUALIZADOR"];
 
@@ -171,10 +172,29 @@ export default async function handler(req, res) {
       const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
       usuarios[idx] = { ...usuarios[idx], RESET_PIN_HASH: sha256Hex(pin), RESET_PIN: pin, RESET_PIN_EXPIRES: expires };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
-      // El PIN no viaja en la respuesta: queda visible solo para ADMIN en el
-      // modulo de usuarios (accion "reset-pins"), quien lo comparte con el
-      // usuario por el canal que prefiera. En desarrollo se permite verlo con
-      // ALLOW_DEV_PIN=SI.
+      // El PIN viaja por correo a los ADMIN activos del proyecto (el correo lo
+      // comparten con quien lo solicito) y queda ademas visible en el modulo
+      // de usuarios (accion "reset-pins") como respaldo. La respuesta al
+      // solicitante es siempre generica: no revela si el correo salio ni a quien.
+      const admins = usuarios.filter((u) =>
+        u.EMPRESA === empresa && u.PROYECTO === proyecto &&
+        String(u.ROL).toUpperCase() === "ADMIN" && String(u.ACTIVO).toUpperCase() === "SI" &&
+        String(u.EMAIL || "").trim()
+      );
+      const destinos = [...new Map(admins.map((a) => [String(a.EMAIL).toLowerCase(), a])).entries()];
+      if (destinos.length) {
+        const resultados = await Promise.allSettled(destinos.map(([correo, a]) =>
+          sendResetPin({
+            to: correo, pin, nombreAdmin: a.NOMBRE,
+            solicitante: usuarios[idx].NOMBRE, emailSolicitante: usuarios[idx].EMAIL,
+            empresa, proyecto
+          })
+        ));
+        const fallidos = resultados.filter((r) => r.status === "rejected" || !r.value?.sent).length;
+        if (fallidos) console.warn(`FORGOT_MAIL_FALLIDOS: ${fallidos}/${destinos.length} correos no enviados.`);
+      } else {
+        console.warn("FORGOT_SIN_ADMINS: solicitud sin ADMIN activo con correo para notificar.");
+      }
       const showPin = process.env.ALLOW_DEV_PIN === "SI";
       return res.json({ success: true, devPin: showPin ? pin : undefined });
     }

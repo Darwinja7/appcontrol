@@ -214,7 +214,7 @@ $("#sendPinBtn").onclick = async () => {
   $("#sendPinBtn").textContent = "Solicitar PIN";
   if (d.success) {
     if (d.devPin) msg($("#pinStatus"), "Entorno de desarrollo: tu PIN es: " + d.devPin, "ok");
-    else msg($("#pinStatus"), "PIN emitido. Por seguridad llegó al administrador de tu proyecto: comunícate con él para obtenerlo.", "ok");
+    else msg($("#pinStatus"), "Solicitud enviada. Comuníquese con el administrador del proyecto para obtener su PIN.", "ok");
     startCountdown(15 * 60);
   } else msg($("#pinStatus"), "No fue posible emitir el PIN.");
 };

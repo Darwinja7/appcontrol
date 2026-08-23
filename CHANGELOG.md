@@ -2,6 +2,14 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado: semver.
 
+## [1.9.2] - 2026-08-23
+### Added
+- Recuperación de contraseña: el PIN llega por correo a todos los administradores activos del proyecto (Resend); el solicitante solo ve la indicación de comunicarse con el administrador. El panel de PINs del módulo de usuarios queda como respaldo.
+- `/api/health` reporta `mailConfigurado` (booleano) para verificar RESEND_API_KEY/MAIL_FROM sin exponer secretos.
+
+### Changed
+- Plantilla del correo de recuperación redactada para el administrador: incluye quién solicitó el cambio, en qué proyecto, el PIN compartible y su vencimiento (15 minutos).
+
 ## [1.9.1] - 2026-08-23
 ### Security
 - Política BYOK (Bring Your Own Key): se elimina el respaldo con variables de entorno del servidor. Cada administrador configura y paga su propio consumo de IA; su llave vive cifrada en LLM_CONFIG y jamás se comparte entre empresas.
