@@ -14,6 +14,20 @@ export const SYNTH_PROYECTOS = [
   { EMPRESA: "E001", CODIGO: "P001", NOMBRE: "SALGUERO ELITE 2", ACTIVO: "SI", DEMO: "NO" }
 ];
 
+// Admin desarrollador: correos en DEVELOPER_ADMINS (separados por coma).
+// Puede crear usuarios en cualquier empresa/proyecto activo y gestionar
+// organizaciones. Sin la variable, todos los ADMIN quedan acotados a su tenant.
+const DEV_ADMINS = new Set(
+  (process.env.DEVELOPER_ADMINS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+export function esDesarrollador(u) {
+  return String(u?.ROL || "").toUpperCase() === "ADMIN" && DEV_ADMINS.has(String(u?.EMAIL || "").toLowerCase());
+}
+
 function bootUser(p) {
   return {
     ID_USUARIO: "BOOT", NOMBRE: "Admin (pruebas)", EMAIL: p.email,

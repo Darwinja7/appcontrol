@@ -7,25 +7,28 @@
 <style>
 body{background:transparent;padding:14px;overflow:auto;min-height:0}
 body::before{display:none}
-.tools{display:grid;grid-template-columns:1.2fr 1.3fr .8fr .7fr auto;gap:10px;align-items:end;margin:16px 0}
+.tools{display:grid;grid-template-columns:1.2fr 1.3fr 1fr 1fr .8fr .7fr auto;gap:10px;align-items:end;margin:16px 0}
 .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700}
 .on{background:rgba(47,191,113,.14);color:#2FBF71}.off{background:rgba(239,68,68,.14);color:#EF4444}
-@media(max-width:850px){.tools{grid-template-columns:1fr}}
+@media(max-width:1000px){.tools{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div class="card" style="margin-top:0">
   <div class="kicker">Administración</div>
   <h2 style="margin:6px 0 4px;font-size:22px">Usuarios y permisos</h2>
-  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores. Cada usuario recibe una contraseña temporal y debe cambiarla al entrar.</p>
+  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores asignando empresa, proyecto y torre. Cada usuario recibe una contraseña temporal y debe cambiarla al entrar.</p>
 
   <div class="tools">
     <div><label>Nombre</label><input id="nombre" placeholder="Nombre completo"/></div>
     <div><label>Correo</label><input id="email" type="email" placeholder="correo@empresa.com"/></div>
+    <div><label>Empresa</label><select id="empresa"></select></div>
+    <div><label>Proyecto</label><select id="proyecto"></select></div>
     <div><label>Rol</label><select id="rol"><option>RESIDENTE</option><option>VISUALIZADOR</option><option>ADMIN</option></select></div>
-    <div><label>Torre</label><input id="torre" value="T1"/></div>
+    <div><label>Torre</label><select id="torre"></select></div>
     <button class="btn" id="crear">Crear usuario</button>
   </div>
+  <div class="hint" style="color:var(--mut);font-size:12px">RESIDENTE requiere una torre concreta. "*" (todas las torres) solo para ADMIN o VISUALIZADOR.</div>
 
   <div class="msg" id="m"></div>
 
@@ -40,24 +43,106 @@ body::before{display:none}
 
 <script src="/js/app.js"></script>
 <script>
+let ME = null, ES_DEV = false, OPCIONES = null;
+
+async function init() {
+  const me = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"me" }) });
+  if (!me.success) return;
+  ME = me.usuario;
+  ES_DEV = !!(ME.esDesarrollador);
+  OPCIONES = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"options" }) });
+
+  const empresas = ES_DEV ? (OPCIONES.empresas || []) : (OPCIONES.empresas || []).filter((e) => e.CODIGO === ME.empresa);
+  fill($("#empresa"), empresas, (e) => ({ v: e.CODIGO, t: e.CODIGO + " - " + e.NOMBRE }));
+  $("#empresa").value = ME.empresa;
+  await cargarProyectos();
+  $("#rol").onchange = cargarTorres;
+  $("#proyecto").onchange = cargarTorres;
+  $("#empresa").onchange = async () => { await cargarProyectos(); };
+  await cargarTorres();
+
+  $("#crear").onclick = crear;
+  cargar();
+  cargarPins();
+  setInterval(cargarPins, 25000);
+}
+
+async function cargarProyectos() {
+  const emp = $("#empresa").value;
+  const proys = (OPCIONES.proyectos || []).filter((p) => p.EMPRESA === emp && String(p.ACTIVO).toUpperCase() === "SI");
+  fill($("#proyecto"), proys, (p) => ({ v: p.CODIGO, t: p.CODIGO + " - " + p.NOMBRE }));
+  if (emp === ME.empresa && proys.some((p) => p.CODIGO === ME.proyecto)) $("#proyecto").value = ME.proyecto;
+  else if (proys.length) $("#proyecto").value = proys[0].CODIGO;
+}
+
+async function cargarTorres() {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"torres-list", empresa: $("#empresa").value, proyecto: $("#proyecto").value }) });
+  const rol = $("#rol").value;
+  let torres = d.success ? d.torres : [];
+  let opts = torres.map((t) => ({ v: t, t }));
+  if (["ADMIN", "VISUALIZADOR"].includes(rol)) opts = [{ v: "*", t: "* (todas las torres)" }, ...opts];
+  fill($("#torre"), opts, (x) => x);
+  if (rol !== "ADMIN" && rol !== "VISUALIZADOR") { /* RESIDENTE sin "*" */ }
+  if (!opts.some((o) => o.v === $("#torre").value)) $("#torre").value = opts.length ? opts[opts.length - 1].v : "";
+}
+
+async function crear() {
+  const body = {
+    nombre: $("#nombre").value.trim(),
+    email: $("#email").value.trim(),
+    rol: $("#rol").value,
+    torre: $("#torre").value,
+    empresa: $("#empresa").value,
+    proyecto: $("#proyecto").value
+  };
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-create", ...body }) });
+  if (d.success) {
+    $("#m").className = "msg ok";
+    $("#m").innerHTML = `Usuario creado en ${esc(body.empresa)}/${esc(body.proyecto)} torre ${esc(d.usuario.torre)}.<br>
+      Correo: <b>${esc(d.usuario.email)}</b><br>
+      Contraseña temporal: <b>${esc(d.usuario.passwordInicial)}</b> (cópiala ahora, no se vuelve a mostrar)<br>
+      Código de acceso generado: <b>${esc(d.usuario.accessCode)}</b>`;
+    $("#nombre").value = ""; $("#email").value = "";
+    cargar();
+  } else {
+    $("#m").className = "msg err";
+    $("#m").textContent = traducirError(d.codigo);
+  }
+}
+
+function traducirError(codigo) {
+  const mapa = {
+    FUERA_DE_TU_PROYECTO: "Solo puedes administrar usuarios de tu propia empresa y proyecto.",
+    TORRE_INVALIDA: "Torre inválida para ese proyecto/rol. Recuerda: RESIDENTE exige una torre concreta.",
+    PROYECTO_INVALIDO: "La empresa o el proyecto no existen o están inactivos.",
+    USUARIO_YA_EXISTE: "Ya existe un usuario con ese correo en ese proyecto.",
+    CODIGO_YA_EXISTE: "Ese código ya está en uso.",
+    SOLO_DESARROLLADOR: "Solo el admin desarrollador gestiona organizaciones."
+  };
+  return mapa[codigo] || codigo || "Error.";
+}
+
 async function cargar() {
   const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-list" }) });
   if (!d.success) {
-    document.querySelector(".card").innerHTML = "<p class='msg err'>Solo ADMIN puede administrar usuarios.</p>";
+    document.querySelector(".card").innerHTML += "<p class='msg err'>No fue posible listar usuarios.</p>";
     return;
   }
 
-  let html = "<table class='grid'><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Torre</th><th>Estado</th><th>Acciones</th></tr>";
+  let html = "<table class='grid'><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Empresa</th><th>Proyecto</th><th>Torre</th><th>Estado</th><th>Acciones</th></tr>";
 
   for (const u of d.usuarios) {
     html += `<tr>
       <td>${esc(u.NOMBRE)}</td>
       <td>${esc(u.EMAIL)}</td>
       <td>${esc(u.ROL)}</td>
+      <td>${esc(u.EMPRESA)}</td>
+      <td>${esc(u.PROYECTO)}</td>
       <td>${esc(u.TORRE)}</td>
       <td><span class='badge ${u.ACTIVO === "SI" ? "on" : "off"}'>${u.ACTIVO === "SI" ? "ACTIVO" : "INACTIVO"}</span></td>
       <td>
         <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' data-act='toggle' data-email='${esc(u.EMAIL)}' data-activo='${u.ACTIVO === "SI" ? "NO" : "SI"}'>${u.ACTIVO === "SI" ? "Desactivar" : "Activar"}</button>
+        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' data-act='torre' data-email='${esc(u.EMAIL)}' data-torre='${esc(u.TORRE)}'>Cambiar torre</button>
         <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' data-act='reset' data-email='${esc(u.EMAIL)}'>Resetear contraseña</button>
       </td>
     </tr>`;
@@ -68,29 +153,34 @@ async function cargar() {
 
   $("#tabla").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
     if (b.dataset.act === "toggle") toggle(b.dataset.email, b.dataset.activo);
+    else if (b.dataset.act === "torre") cambiarTorre(b.dataset.email, b.dataset.torre);
     else resetPass(b.dataset.email);
   });
 }
 
-$("#crear").onclick = async () => {
-  const body = {
-    nombre: $("#nombre").value.trim(),
-    email: $("#email").value.trim(),
-    rol: $("#rol").value,
-    torre: $("#torre").value.trim() || "*"
-  };
+async function toggle(email, activo) {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, activo }) });
+  if (!d.success) alert(traducirError(d.codigo));
+  cargar();
+}
 
-  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-create", ...body }) });
+async function cambiarTorre(email, actual) {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"torres-list" }) });
+  const torres = d.success ? d.torres : [];
+  const entrada = prompt("Nueva torre para " + email + ".\nTorres válidas: " + ["*", ...torres].join(", ") + "\nActual: " + actual);
+  if (entrada === null) return;
+  const r = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, torre: entrada.trim() }) });
+  if (!r.success) alert(traducirError(r.codigo));
+  cargar();
+}
 
-  if (d.success) {
-    $("#m").className = "msg ok";
-    $("#m").innerHTML = `Usuario creado.<br>
-      Correo: <b>${esc(d.usuario.email)}</b><br>
-      Contraseña temporal: <b>${esc(d.usuario.passwordInicial)}</b> (cópiala ahora, no se vuelve a mostrar)<br>
-      Código de acceso generado: <b>${esc(d.usuario.accessCode)}</b><br>
-      En la hoja solo queda guardado en hash.`;
-    $("#nombre").value = "";
-    $("#email").value = "";
+async function resetPass(email) {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, resetPassword: true }) });
+  if (d.success && d.passwordTemporal) alert("Contraseña reiniciada a: " + d.passwordTemporal + ". El usuario deberá cambiarla al entrar.");
+  else alert(d.success ? "Contraseña reiniciada." : "No fue posible reiniciar la contraseña.");
+  cargar();
+}
+
 async function cargarPins() {
   const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"reset-pins" }) });
   if (!d.success || !d.pendientes.length) { $("#pinsCard").style.display = "none"; return; }
@@ -110,29 +200,7 @@ async function cargarPins() {
   $("#pinsTabla").innerHTML = html;
 }
 
-cargar();
-cargarPins();
-setInterval(cargarPins, 25000);
-  } else {
-    $("#m").className = "msg err";
-    $("#m").textContent = d.codigo || "Error creando usuario.";
-  }
-};
-
-async function toggle(email, activo) {
-  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, activo }) });
-  if (!d.success) alert("No fue posible cambiar el estado. " + (d.codigo || ""));
-  cargar();
-}
-
-async function resetPass(email) {
-  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, resetPassword: true }) });
-  if (d.success && d.passwordTemporal) alert("Contraseña reiniciada a: " + d.passwordTemporal + ". El usuario deberá cambiarla al entrar.");
-  else alert(d.success ? "Contraseña reiniciada." : "No fue posible reiniciar la contraseña.");
-  cargar();
-}
-
-cargar();
+init();
 </script>
 </body>
 </html>

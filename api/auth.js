@@ -7,7 +7,7 @@ import {
 import { limitar, ipCliente } from "./_lib/rate-limit.js";
 import {
   currentUser, bootstrapOk, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD,
-  SYNTH_EMPRESAS, SYNTH_PROYECTOS
+  SYNTH_EMPRESAS, SYNTH_PROYECTOS, esDesarrollador
 } from "./_lib/session.js";
 
 const ROLES_VALIDOS = ["ADMIN", "RESIDENTE", "VISUALIZADOR"];
@@ -20,6 +20,41 @@ function siguienteIdUsuario(usuarios) {
     return Number.isFinite(n) && n > m ? n : m;
   }, 0);
   return "U" + String(max + 1).padStart(4, "0");
+}
+
+// Validacion en cascada para asignar usuarios: empresa activa > proyecto
+// activo perteneciente a esa empresa.
+async function destinoValido(empresa, proyecto) {
+  const [empresas, proyectos] = await Promise.all([readRows("EMPRESAS"), readRows("PROYECTOS")]);
+  const empOk = empresas.find((e) => e.CODIGO === empresa && String(e.ACTIVO).toUpperCase() === "SI");
+  const proyOk = proyectos.find((p) => p.EMPRESA === empresa && p.CODIGO === proyecto && String(p.ACTIVO).toUpperCase() === "SI");
+  return !!(empOk && proyOk);
+}
+
+// Torres reales del proyecto: union de NIVELES y UNIDADES (misma fuente del
+// modulo de configuracion).
+async function torresDeProyecto(proyecto) {
+  const [niveles, unidades] = await Promise.all([readRows("NIVELES"), readRows("UNIDADES")]);
+  return [...new Set([
+    ...niveles.filter((n) => String(n.PROYECTO || "") === proyecto).map((n) => String(n.TORRE || "")),
+    ...unidades.filter((x) => String(x.PROYECTO || "") === proyecto).map((x) => String(x.TORRE || ""))
+  ])].filter(Boolean);
+}
+
+// Regla de torre por rol: "*" solo para ADMIN/VISUALIZADOR; RESIDENTE exige
+// una torre real del proyecto.
+function torreValida(torre, rol, torresProy) {
+  const t = String(torre || "").trim();
+  if (t === "*") return ["ADMIN", "VISUALIZADOR"].includes(String(rol)) ? { t } : null;
+  if (!t) return null;
+  return torresProy.includes(t) ? { t } : null;
+}
+
+// Combinacion final coherente en users-patch: un RESIDENTE nunca queda con "*".
+function combinacionRolTorreOk(u) {
+  const t = String(u.TORRE || "").trim();
+  if (t !== "*") return true;
+  return ["ADMIN", "VISUALIZADOR"].includes(String(u.ROL || "").toUpperCase());
 }
 
 function setSession(res, email, empresa, proyecto, rol, boot = false) {
@@ -97,7 +132,7 @@ export default async function handler(req, res) {
     if (a === "me") {
       const c = await currentUser(req);
       if (!c) return res.status(401).json({ success: false });
-      return res.json({ success: true, usuario: { id: c.u.ID_USUARIO, nombre: c.u.NOMBRE, email: c.u.EMAIL, rol: c.u.ROL, empresa: c.u.EMPRESA, proyecto: c.u.PROYECTO, torre: c.u.TORRE } });
+      return res.json({ success: true, usuario: { id: c.u.ID_USUARIO, nombre: c.u.NOMBRE, email: c.u.EMAIL, rol: c.u.ROL, empresa: c.u.EMPRESA, proyecto: c.u.PROYECTO, torre: c.u.TORRE, esDesarrollador: esDesarrollador(c.u) } });
     }
 
     if (a === "change-password") {
@@ -178,22 +213,84 @@ export default async function handler(req, res) {
       return res.json({ success: true });
     }
 
+    // Torres disponibles de un proyecto (selects de asignacion de usuarios).
+    if (a === "torres-list") {
+      const c = await currentUser(req);
+      if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const esDev = esDesarrollador(c.u);
+      const emp = String(b.empresa || c.u.EMPRESA);
+      const proy = String(b.proyecto || c.u.PROYECTO);
+      if (!esDev && (emp !== c.u.EMPRESA || proy !== c.u.PROYECTO))
+        return res.status(403).json({ success: false, codigo: "FUERA_DE_TU_PROYECTO" });
+      if (!(await destinoValido(emp, proy))) return res.status(400).json({ success: false, codigo: "PROYECTO_INVALIDO" });
+      return res.json({ success: true, torres: await torresDeProyecto(proy) });
+    }
+
+    // Organizaciones: solo el admin desarrollador crea o edita empresas y
+    // proyectos. La lectura publica ya existe en la accion "options".
+    if (a === "empresas-save" || a === "proyectos-save") {
+      const c = await currentUser(req);
+      if (!c || !esDesarrollador(c.u)) return res.status(403).json({ success: false, codigo: "SOLO_DESARROLLADOR" });
+
+      if (a === "empresas-save") {
+        const { codigo = "", nombre = "", activo = "SI", codigoOriginal } = b;
+        if (!codigo || !nombre) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
+        if (!["SI", "NO"].includes(String(activo).toUpperCase())) return res.status(400).json({ success: false, codigo: "VALOR_INVALIDO" });
+        const empresas = await readRows("EMPRESAS");
+        const idx = codigoOriginal ? empresas.findIndex((e) => e.CODIGO === codigoOriginal) : -1;
+        const duplicado = empresas.some((e, i) => i !== idx && e.CODIGO === codigo);
+        if (duplicado) return res.status(409).json({ success: false, codigo: "CODIGO_YA_EXISTE" });
+        if (idx >= 0) empresas[idx] = { ...empresas[idx], CODIGO: codigo, NOMBRE: nombre, ACTIVO: String(activo).toUpperCase() };
+        else empresas.push({ CODIGO: codigo, NOMBRE: nombre, ACTIVO: String(activo).toUpperCase() });
+        await replaceRows("EMPRESAS", HEADERS.EMPRESAS, empresas.map((r) => HEADERS.EMPRESAS.map((h) => r[h] ?? "")), empresas.length);
+        return res.json({ success: true });
+      }
+
+      if (a === "proyectos-save") {
+        const { empresa = "", codigo = "", nombre = "", activo = "SI", demo = "NO", codigoOriginal } = b;
+        if (!empresa || !codigo || !nombre) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
+        if (!["SI", "NO"].includes(String(activo).toUpperCase()) || !["SI", "NO"].includes(String(demo).toUpperCase()))
+          return res.status(400).json({ success: false, codigo: "VALOR_INVALIDO" });
+        const empresas = await readRows("EMPRESAS");
+        if (!empresas.find((e) => e.CODIGO === empresa && String(e.ACTIVO).toUpperCase() === "SI"))
+          return res.status(400).json({ success: false, codigo: "EMPRESA_INVALIDA" });
+        const proyectos = await readRows("PROYECTOS");
+        const idx = codigoOriginal ? proyectos.findIndex((p) => p.CODIGO === codigoOriginal && p.EMPRESA === empresa) : -1;
+        const duplicado = proyectos.some((p, i) => i !== idx && p.EMPRESA === empresa && p.CODIGO === codigo);
+        if (duplicado) return res.status(409).json({ success: false, codigo: "CODIGO_YA_EXISTE" });
+        if (idx >= 0) proyectos[idx] = { ...proyectos[idx], EMPRESA: empresa, CODIGO: codigo, NOMBRE: nombre, ACTIVO: String(activo).toUpperCase(), DEMO: String(demo).toUpperCase() };
+        else proyectos.push({ EMPRESA: empresa, CODIGO: codigo, NOMBRE: nombre, ACTIVO: String(activo).toUpperCase(), DEMO: String(demo).toUpperCase() });
+        await replaceRows("PROYECTOS", HEADERS.PROYECTOS, proyectos.map((r) => HEADERS.PROYECTOS.map((h) => r[h] ?? "")), proyectos.length);
+        return res.json({ success: true });
+      }
+    }
+
     if (a === "users-list" || a === "users-create" || a === "users-patch") {
       const c = await currentUser(req);
       if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const esDev = esDesarrollador(c.u);
       const usuarios = await readRows("USUARIOS");
 
       if (a === "users-list") {
         const rows = usuarios.filter((u) => u.EMPRESA === c.u.EMPRESA && u.PROYECTO === c.u.PROYECTO)
-          .map((u) => ({ ID_USUARIO: u.ID_USUARIO, NOMBRE: u.NOMBRE, EMAIL: u.EMAIL, ROL: u.ROL, TORRE: u.TORRE, ACTIVO: u.ACTIVO }));
+          .map((u) => ({ ID_USUARIO: u.ID_USUARIO, NOMBRE: u.NOMBRE, EMAIL: u.EMAIL, ROL: u.ROL, EMPRESA: u.EMPRESA, PROYECTO: u.PROYECTO, TORRE: u.TORRE, ACTIVO: u.ACTIVO }));
         return res.json({ success: true, usuarios: rows });
       }
 
       if (a === "users-create") {
-        const { nombre = "", email = "", rol = "RESIDENTE", torre = "*" } = b;
+        const { nombre = "", email = "", rol = "RESIDENTE", torre = "*", empresa, proyecto } = b;
+        const empDestino = String(empresa || c.u.EMPRESA);
+        const proyDestino = String(proyecto || c.u.PROYECTO);
         if (!nombre || !email) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
+        // Aislamiento por tenant: salvo admin desarrollador, solo se crea
+        // usuarios dentro de la empresa/proyecto propios.
+        if (!esDev && (empDestino !== c.u.EMPRESA || proyDestino !== c.u.PROYECTO))
+          return res.status(403).json({ success: false, codigo: "FUERA_DE_TU_PROYECTO" });
+        if (!(await destinoValido(empDestino, proyDestino))) return res.status(400).json({ success: false, codigo: "PROYECTO_INVALIDO" });
         if (!ROLES_VALIDOS.includes(String(rol))) return res.status(400).json({ success: false, codigo: "ROL_INVALIDO" });
-        if (usuarios.some((u) => String(u.EMAIL || "").toLowerCase() === String(email).toLowerCase() && u.EMPRESA === c.u.EMPRESA && u.PROYECTO === c.u.PROYECTO))
+        const tv = torreValida(torre, rol, await torresDeProyecto(proyDestino));
+        if (!tv) return res.status(400).json({ success: false, codigo: "TORRE_INVALIDA" });
+        if (usuarios.some((u) => String(u.EMAIL || "").toLowerCase() === String(email).toLowerCase() && u.EMPRESA === empDestino && u.PROYECTO === proyDestino))
           return res.status(409).json({ success: false, codigo: "USUARIO_YA_EXISTE" });
         const id = siguienteIdUsuario(usuarios);
         const { randomBytes } = await import("crypto");
@@ -201,24 +298,34 @@ export default async function handler(req, res) {
         const tempPass = passwordTemporal();
         usuarios.push({
           ID_USUARIO: id, NOMBRE: nombre, EMAIL: String(email).toLowerCase(), ROL: rol,
-          EMPRESA: c.u.EMPRESA, PROYECTO: c.u.PROYECTO, TORRE: torre,
+          EMPRESA: empDestino, PROYECTO: proyDestino, TORRE: tv.t,
           SENDER_ID: String(email).toLowerCase(), PASSWORD_HASH: hashPassword(tempPass),
           MUST_CHANGE_PASSWORD: "SI", ACCESS_CODE_HASH: sha256Hex(accessCode),
           RESET_PIN_HASH: "", RESET_PIN: "", RESET_PIN_EXPIRES: "", ACTIVO: "SI"
         });
         await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
-        return res.json({ success: true, usuario: { id, nombre, email, rol, torre, passwordInicial: tempPass, accessCode } });
+        return res.json({ success: true, usuario: { id, nombre, email, rol, torre: tv.t, passwordInicial: tempPass, accessCode } });
       }
 
       if (a === "users-patch") {
-        const { email = "", rol, torre, activo, resetPassword } = b;
-        const idx = usuarios.findIndex((u) => String(u.EMAIL || "").toLowerCase() === String(email).toLowerCase() && u.EMPRESA === c.u.EMPRESA && u.PROYECTO === c.u.PROYECTO);
+        const { email = "", rol, torre, activo, resetPassword, empresa, proyecto } = b;
+        const reqEmp = String(empresa || c.u.EMPRESA);
+        const reqProy = String(proyecto || c.u.PROYECTO);
+        if (!esDev && (reqEmp !== c.u.EMPRESA || reqProy !== c.u.PROYECTO))
+          return res.status(403).json({ success: false, codigo: "FUERA_DE_TU_PROYECTO" });
+        const idx = usuarios.findIndex((u) => String(u.EMAIL || "").toLowerCase() === String(email).toLowerCase() && u.EMPRESA === reqEmp && u.PROYECTO === reqProy);
         if (idx < 0) return res.status(404).json({ success: false, codigo: "USUARIO_NO_EXISTE" });
         if (rol !== undefined && rol !== "") {
           if (!ROLES_VALIDOS.includes(String(rol))) return res.status(400).json({ success: false, codigo: "ROL_INVALIDO" });
           usuarios[idx].ROL = String(rol);
         }
-        if (torre !== undefined) usuarios[idx].TORRE = String(torre).trim() || "*";
+        if (torre !== undefined && torre !== "") {
+          const tv = torreValida(torre, usuarios[idx].ROL, await torresDeProyecto(usuarios[idx].PROYECTO));
+          if (!tv) return res.status(400).json({ success: false, codigo: "TORRE_INVALIDA" });
+          usuarios[idx].TORRE = tv.t;
+        }
+        // Combinacion final rol/torre siempre coherente ("*" no aplica a RESIDENTE).
+        if (!(await combinacionRolTorreOk(usuarios[idx]))) return res.status(400).json({ success: false, codigo: "TORRE_INVALIDA" });
         if (activo !== undefined && activo !== "") {
           const v = String(activo).toUpperCase();
           if (!["SI", "NO"].includes(v)) return res.status(400).json({ success: false, codigo: "VALOR_INVALIDO" });
