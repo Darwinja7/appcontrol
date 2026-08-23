@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "google-auth-library": "^9.14.0",
+    "google-auth-library": "^9.14.0"
+  },
+  "devDependencies": {
     "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }
