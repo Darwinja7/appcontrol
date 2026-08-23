@@ -58,6 +58,16 @@ export const HEADERS = {
     "VALOR",
     "CONTRATISTA",
     "USUARIO"
+  ],
+
+  // Historico de avances calculados (snapshot diario por registro).
+  // AMBITO: "GENERAL" | "NIVEL:<n>" | "UNIDAD:<unidad>" | "TORRE:<t>"
+  // AVANCE: porcentaje 0-100 con un decimal.
+  HISTORICO: [
+    "FECHA",
+    "PROYECTO",
+    "AMBITO",
+    "AVANCE"
   ]
 };
 

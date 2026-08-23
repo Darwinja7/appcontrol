@@ -31,6 +31,9 @@ body::before{display:none}
   </div>
   <div class="kpis" id="kpis"></div>
   <div id="ins"></div>
+  <h3 style="margin:16px 0 4px">Avance del proyecto en el tiempo</h3>
+  <p style="color:var(--mut);font-size:12px;margin-bottom:6px">Snapshot diario calculado con cada registro. La dona y estos puntos vienen de la misma matemática ponderada.</p>
+  <div id="chart"></div>
   <h3 style="margin:16px 0 8px">Avance por capítulo (ponderado)</h3>
   <div id="caps"></div>
   <h3 style="margin:16px 0 8px">Avance por nivel</h3>
@@ -57,6 +60,50 @@ async function init() {
   if ($("#proyecto").options.length > 1) { $("#proyecto").value = $("#proyecto").options[1].value; }
   ["proyecto", "torre", "capitulo", "contratista", "actividad"].forEach((id) => $("#" + id).onchange = compute);
   compute();
+  cargarHistorico();
+}
+
+/* Grafica de avance en el tiempo (SVG sin dependencias) */
+async function cargarHistorico() {
+  const caja = document.getElementById("chart");
+  try {
+    const h = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"historico" }) });
+    renderChart(caja, (h.puntos || []).filter((p) => p.ambito === "GENERAL"));
+  } catch { /* el chart es complemento: si falla no rompe el dashboard */ }
+}
+function renderChart(caja, puntos) {
+  puntos.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  const W = 640, H = 220, L = 42, R = 52, T = 14, B = 30;
+  const X = (i) => puntos.length < 2 ? (L + (W - L - R) / 2) : L + ((W - L - R) * i) / (puntos.length - 1);
+  const Y = (v) => T + ((H - T - B) * (100 - v)) / 100;
+  let g = "";
+  for (const gv of [0, 25, 50, 75, 100]) {
+    g += `<line x1='${L}' y1='${Y(gv)}' x2='${W - R}' y2='${Y(gv)}' stroke='#1D2833' stroke-width='1'/>`;
+    g += `<text x='${L - 6}' y='${Y(gv) + 4}' fill='#93A1B0' font-size='10' text-anchor='end'>${gv}%</text>`;
+  }
+  if (puntos.length === 0) {
+    caja.innerHTML = `<svg viewBox='0 0 ${W} ${H}' style='width:100%;height:auto'>${g}<text x='${W / 2}' y='${H / 2}' fill='#93A1B0' font-size='13' text-anchor='middle'>El historico se llena solo: cada dia con registros guarda un snapshot.</text></svg>`;
+    return;
+  }
+  const pts = puntos.map((p, i) => [X(i), Y(Math.min(100, Math.max(0, p.avance)))]);
+  const linea = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const area = linea + ` L${pts[pts.length - 1][0].toFixed(1)},${Y(0)} L${pts[0][0].toFixed(1)},${Y(0)} Z`;
+  const dots = pts.map((p, i) => `<circle cx='${p[0].toFixed(1)}' cy='${p[1].toFixed(1)}' r='3.5' fill='#FFB020' stroke='#0B0F14' stroke-width='1.5'/>`).join("");
+  const f1 = new Date(puntos[0].fecha).toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
+  const f2 = new Date(puntos[puntos.length - 1].fecha).toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
+  const ult = puntos[puntos.length - 1].avance.toFixed(1);
+  const etiquetaUlt = `<text x='${Math.min(pts[pts.length - 1][0] + 8, W - 4)}' y='${pts[pts.length - 1][1] + 4}' fill='#FFB020' font-size='12' font-weight='700'>${ult}%</text>`;
+  caja.innerHTML = `<svg viewBox='0 0 ${W} ${H}' style='width:100%;height:auto'>
+    <defs><linearGradient id='gradArea' x1='0' y1='0' x2='0' y2='1'>
+      <stop offset='0%' stop-color='rgba(255,176,32,.30)'/><stop offset='100%' stop-color='rgba(255,176,32,0)'/>
+    </linearGradient></defs>
+    ${g}
+    <path d='${area}' fill='url(#gradArea)'/>
+    <path d='${linea}' fill='none' stroke='#FFB020' stroke-width='2.5' stroke-linejoin='round'/>
+    ${dots}${etiquetaUlt}
+    <text x='${L}' y='${H - 10}' fill='#93A1B0' font-size='10'>${esc(f1)}</text>
+    <text x='${W - R}' y='${H - 10}' fill='#93A1B0' font-size='10' text-anchor='end'>${esc(f2)}</text>
+  </svg>`;
 }
 function torres() { return [...new Set(D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value).map((u) => u.TORRE))]; }
 function scopeCfg() {
