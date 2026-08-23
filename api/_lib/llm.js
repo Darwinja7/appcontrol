@@ -1,40 +1,30 @@
 import { readRows } from "./sheets.js";
 import { descifrarLlave } from "./crypto-llm.js";
-import { PROVEEDORES, resolverProveedor } from "./llm-providers.js";
-import { HEADERS } from "./model.js";
+import { resolverProveedor } from "./llm-providers.js";
 
-// Resuelve la config LLM efectiva para un usuario:
-//  1) su fila en LLM_CONFIG (llave cifrada en la hoja)
-//  2) respaldo por variables de entorno del proveedor (ej. OPENROUTER_API_KEY
-//     con el modelo por defecto openrouter/stealth/ox-alpha en esfuerzo low)
-// Devuelve null si no hay nada configurado.
+// Resuelve la config LLM efectiva para un usuario.
+// Politica BYOK: SOLO se usa la llave propia del administrador guardada
+// cifrada en LLM_CONFIG. No hay respaldo con variables del servidor —
+// cada empresa paga su propio consumo de IA.
+// Devuelve null si el admin no configuro su proveedor con llave.
 export async function resolverLlm(u) {
   const filas = await readRows("LLM_CONFIG");
   const fila = filas.find((f) => String(f.EMAIL || "").toLowerCase() === String(u.EMAIL || "").toLowerCase());
-  if (fila && fila.PROVEEDOR) {
-    const prov = resolverProveedor(fila.PROVEEDOR);
-    if (!prov) return null;
-    let llave = "";
-    try { llave = fila.KEY_ENC ? descifrarLlave(fila.KEY_ENC) : ""; } catch { llave = ""; }
-    if (!llave && prov.envFallback) llave = process.env[prov.envFallback] || "";
-    if (!prov.baseUrl && !fila.BASE_URL) return null;
-    return {
-      proveedor: fila.PROVEEDOR,
-      baseUrl: fila.BASE_URL || prov.baseUrl,
-      modelo: fila.MODELO || prov.modeloDefault,
-      razonamientoBajo: !!prov.razonamientoBajo,
-      llave,
-      origen: fila.KEY_ENC ? "propia" : "servidor"
-    };
-  }
-  for (const [id, prov] of Object.entries(PROVEEDORES)) {
-    if (!prov.envFallback) continue;
-    const llave = process.env[prov.envFallback];
-    if (llave) {
-      return { proveedor: id, baseUrl: prov.baseUrl, modelo: prov.modeloDefault, razonamientoBajo: !!prov.razonamientoBajo, llave, origen: "servidor" };
-    }
-  }
-  return null;
+  if (!fila || !fila.PROVEEDOR || !fila.KEY_ENC) return null;
+  const prov = resolverProveedor(fila.PROVEEDOR);
+  if (!prov) return null;
+  let llave = "";
+  try { llave = descifrarLlave(fila.KEY_ENC); } catch { return null; }
+  if (!llave) return null;
+  if (!prov.baseUrl && !fila.BASE_URL) return null;
+  return {
+    proveedor: fila.PROVEEDOR,
+    baseUrl: fila.BASE_URL || prov.baseUrl,
+    modelo: fila.MODELO || prov.modeloDefault,
+    razonamientoBajo: !!prov.razonamientoBajo,
+    llave,
+    origen: "propia"
+  };
 }
 
 export async function chatLlm(cfg, mensajes, { timeoutMs = 30000, maxTokens = 900 } = {}) {

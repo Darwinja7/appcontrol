@@ -2,6 +2,10 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado: semver.
 
+## [1.9.1] - 2026-08-23
+### Security
+- Política BYOK (Bring Your Own Key): se elimina el respaldo con variables de entorno del servidor. Cada administrador configura y paga su propio consumo de IA; su llave vive cifrada en LLM_CONFIG y jamás se comparte entre empresas.
+
 ## [1.9.0] - 2026-08-23
 ### Added
 - Asistente IA opcional por administrador: módulo nuevo con configuración de proveedor (OpenRouter, Hugging Face, OpenCode, OrcaRouter, OpenAI, Anthropic, Groq y Personalizado compatible OpenAI). Llave cifrada con AES-256-GCM derivado de SESSION_SECRET; nunca vuelve al cliente.

@@ -42,7 +42,7 @@ table.grid{font-size:12px}
         <button class="btn secondary" id="probar">Probar conexión</button>
       </div>
       <div class="msg" id="mCfg"></div>
-      <p class="mini">Sin llave propia, AppControl usa la del servidor si existe (OpenRouter · modelo stealth ox-alpha en esfuerzo bajo).</p>
+      <p class="mini">Trae tu propia llave: cada administrador configura y paga su propio consumo de IA. La llave queda cifrada en la base y jamás se comparte entre empresas.</p>
     </div>
 
     <div class="card chat" style="margin:0">
@@ -117,7 +117,7 @@ async function enviar() {
   const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"wizard-chat", mensajes: MENSAJES }) });
   $(".msgs").lastChild.remove();
   if (!d.success) {
-    const texto = d.codigo === "SIN_LLM" ? "No hay IA configurada. Configura tu proveedor a la izquierda o usa el modo guiado." : "Error del proveedor: " + (d.detalle || d.codigo);
+    const texto = d.codigo === "SIN_LLM" ? "Aún no tienes IA configurada. Elige tu proveedor, pega tu llave API y guárdala — tú pagas solo tu consumo." : "Error del proveedor: " + (d.detalle || d.codigo);
     agregarBurb(texto, "bot"); return;
   }
   MENSAJES.push({ role:"assistant", content:d.mensaje });
