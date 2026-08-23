@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { readRows } from "./sheets.js";
 
+// Secreto de sesión: usa la variable de Vercel; si falta, fallback de desarrollo
+// (en producción SIEMPRE define SESSION_SECRET).
+const SECRET = process.env.SESSION_SECRET || "appcontrol-dev-secret-temporal";
+
 export const sha256Hex = (i) =>
   crypto.createHash("sha256").update(String(i)).digest("hex");
 
@@ -23,15 +27,11 @@ export function hashPassword(password) {
 
 export function verifyPassword(password, stored) {
   const s = String(stored || "");
-
-  // Compatibilidad con hashes SHA-256 antiguos o iniciales.
   if (/^[a-f0-9]{64}$/i.test(s)) {
     return safeCompare(sha256Hex(password), s);
   }
-
   const parts = s.split("$");
   if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-
   const [, iterations, salt, hash] = parts;
   const calc = crypto.pbkdf2Sync(String(password), salt, Number(iterations), 32, "sha256").toString("hex");
   return safeCompare(calc, hash);
@@ -44,11 +44,7 @@ function b64url(x) {
 export function createToken(payload, ttl) {
   const now = Math.floor(Date.now() / 1000);
   const data = b64url(JSON.stringify({ ...payload, iat: now, exp: now + ttl }));
-  const sig = crypto
-    .createHmac("sha256", process.env.SESSION_SECRET)
-    .update(data)
-    .digest("base64url");
-
+  const sig = crypto.createHmac("sha256", SECRET).update(data).digest("base64url");
   return data + "." + sig;
 }
 
@@ -56,17 +52,10 @@ export function verifyToken(token) {
   try {
     const [data, sig] = String(token || "").split(".");
     if (!data || !sig) return null;
-
-    const exp = crypto
-      .createHmac("sha256", process.env.SESSION_SECRET)
-      .update(data)
-      .digest("base64url");
-
+    const exp = crypto.createHmac("sha256", SECRET).update(data).digest("base64url");
     if (!safeCompare(exp, sig)) return null;
-
     const p = JSON.parse(Buffer.from(data, "base64url").toString("utf8"));
     if (Math.floor(Date.now() / 1000) > (p.exp || 0)) return null;
-
     return p;
   } catch {
     return null;
@@ -80,35 +69,6 @@ export function parseCookies(h) {
     if (k) o[k] = decodeURIComponent(v.join("="));
   });
   return o;
-}
-
-function cookieHeader(req) {
-  if (req.headers && typeof req.headers.get === "function") return req.headers.get("cookie");
-  return req.headers?.cookie || "";
-}
-
-export async function requireUser(req) {
-  const cookies = parseCookies(cookieHeader(req));
-  const p = verifyToken(cookies.appcontrol_session);
-
-  if (!p || p.scope !== "web") return null;
-
-  const usuarios = await readRows("USUARIOS");
-
-  const user = usuarios.find((u) =>
-    String(u.EMAIL || "").toLowerCase() === String(p.email || "").toLowerCase() &&
-    String(u.EMPRESA || "") === String(p.empresa || "") &&
-    String(u.PROYECTO || "") === String(p.proyecto || "")
-  );
-
-  if (!user) return null;
-  if (String(user.ACTIVO).toUpperCase() !== "SI") return null;
-
-  return user;
-}
-
-export function randomCode(len = 24) {
-  return crypto.randomBytes(len).toString("base64url");
 }
 
 export function resetPin() {
