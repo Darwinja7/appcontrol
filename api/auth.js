@@ -1,4 +1,4 @@
-import { readRows, replaceRows } from "./_lib/sheets.js";
+import { readRows, replaceRows, appendRows } from "./_lib/sheets.js";
 import { HEADERS } from "./_lib/model.js";
 import {
   verifyPassword, hashPassword, createToken,
