@@ -12,11 +12,17 @@ async function current(req) {
   const p = verifyToken(cookies.appcontrol_session);
   if (!p || p.scope !== "web") return null;
   const usuarios = await readRows("USUARIOS");
-  return usuarios.find((x) =>
+  const u = usuarios.find((x) =>
     String(x.EMAIL || "").toLowerCase() === String(p.email || "").toLowerCase() &&
     String(x.EMPRESA || "") === String(p.empresa || "") &&
     String(x.PROYECTO || "") === String(p.proyecto || "")
   ) || null;
+  if (u && String(u.ACTIVO).toUpperCase() === "SI") return u;
+  if (p.boot === true) {
+    return { ID_USUARIO: "BOOT", NOMBRE: "Admin (pruebas)", EMAIL: p.email, ROL: p.rol || "ADMIN",
+      EMPRESA: p.empresa, PROYECTO: p.proyecto, TORRE: "*", ACTIVO: "SI", SENDER_ID: p.email };
+  }
+  return null;
 }
 
 export default async function handler(req, res) {

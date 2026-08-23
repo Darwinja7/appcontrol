@@ -6,6 +6,29 @@ import {
 } from "./_lib/auth.js";
 import { sendResetPin } from "./_lib/mail.js";
 
+// ============================================================
+// MALA PRACTICA TEMPORAL (solicitada para pruebas de diseño):
+// admin embebido que funciona con hojas vacias.
+// EN PRODUCCION: cambiar ENABLE_BOOTSTRAP a false.
+// ============================================================
+const ENABLE_BOOTSTRAP = true;
+const BOOTSTRAP_EMAIL = "director@urbanizadorajimenez.com";
+const BOOTSTRAP_PASSWORD = "123456";
+
+const SYNTH_EMPRESAS = [{ CODIGO: "E001", NOMBRE: "URBANIZADORA JIMENEZ", ACTIVO: "SI" }];
+const SYNTH_PROYECTOS = [
+  { EMPRESA: "E001", CODIGO: "P000", NOMBRE: "SALGUERO ELITE 1", ACTIVO: "SI", DEMO: "SI" },
+  { EMPRESA: "E001", CODIGO: "P001", NOMBRE: "SALGUERO ELITE 2", ACTIVO: "SI", DEMO: "NO" }
+];
+
+function bootUser(p) {
+  return {
+    ID_USUARIO: "BOOT", NOMBRE: "Admin (pruebas)", EMAIL: BOOTSTRAP_EMAIL,
+    ROL: "ADMIN", EMPRESA: p.empresa, PROYECTO: p.proyecto, TORRE: "*",
+    ACTIVO: "SI", SENDER_ID: BOOTSTRAP_EMAIL
+  };
+}
+
 function cookieHeader(req) {
   if (req.headers && typeof req.headers.get === "function") return req.headers.get("cookie");
   return req.headers?.cookie || "";
@@ -21,12 +44,13 @@ async function current(req) {
     String(x.EMPRESA || "") === String(p.empresa || "") &&
     String(x.PROYECTO || "") === String(p.proyecto || "")
   );
-  if (!u || String(u.ACTIVO).toUpperCase() !== "SI") return null;
-  return { p, u };
+  if (u && String(u.ACTIVO).toUpperCase() === "SI") return { p, u };
+  if (ENABLE_BOOTSTRAP && p.boot === true) return { p, u: bootUser(p) };
+  return null;
 }
 
-function setSession(res, email, empresa, proyecto, rol) {
-  const token = createToken({ email, empresa, proyecto, rol, scope: "web" }, 8 * 3600);
+function setSession(res, email, empresa, proyecto, rol, boot = false) {
+  const token = createToken({ email, empresa, proyecto, rol, boot, scope: "web" }, 8 * 3600);
   res.setHeader("Set-Cookie", `appcontrol_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800; Secure`);
 }
 
@@ -36,12 +60,13 @@ export default async function handler(req, res) {
     const a = b.action || "";
 
     if (a === "options") {
-      const [empresas, proyectos] = await Promise.all([readRows("EMPRESAS"), readRows("PROYECTOS")]);
-      return res.json({
-        success: true,
-        empresas: empresas.filter((e) => String(e.ACTIVO).toUpperCase() === "SI"),
-        proyectos: proyectos.filter((p) => String(p.ACTIVO).toUpperCase() === "SI")
-      });
+      let empresas = (await readRows("EMPRESAS")).filter((e) => String(e.ACTIVO).toUpperCase() === "SI");
+      let proyectos = (await readRows("PROYECTOS")).filter((p) => String(p.ACTIVO).toUpperCase() === "SI");
+      if (ENABLE_BOOTSTRAP) {
+        if (!empresas.length) empresas = SYNTH_EMPRESAS;
+        if (!proyectos.length) proyectos = SYNTH_PROYECTOS;
+      }
+      return res.json({ success: true, empresas, proyectos });
     }
 
     if (a === "login") {
@@ -49,26 +74,42 @@ export default async function handler(req, res) {
       if (!empresa || !proyecto || !email || !password) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
 
       const [empresas, proyectos, usuarios] = await Promise.all([readRows("EMPRESAS"), readRows("PROYECTOS"), readRows("USUARIOS")]);
-      if (!empresas.find((e) => e.CODIGO === empresa && String(e.ACTIVO).toUpperCase() === "SI"))
-        return res.status(401).json({ success: false, codigo: "EMPRESA_INVALIDA" });
-      if (!proyectos.find((p) => p.EMPRESA === empresa && p.CODIGO === proyecto && String(p.ACTIVO).toUpperCase() === "SI"))
-        return res.status(401).json({ success: false, codigo: "PROYECTO_INVALIDO" });
+      const empOk = empresas.find((e) => e.CODIGO === empresa && String(e.ACTIVO).toUpperCase() === "SI") ||
+        (ENABLE_BOOTSTRAP && SYNTH_EMPRESAS.find((e) => e.CODIGO === empresa));
+      if (!empOk) return res.status(401).json({ success: false, codigo: "EMPRESA_INVALIDA" });
+      const proyOk = proyectos.find((p) => p.EMPRESA === empresa && p.CODIGO === proyecto && String(p.ACTIVO).toUpperCase() === "SI") ||
+        (ENABLE_BOOTSTRAP && SYNTH_PROYECTOS.find((p) => p.EMPRESA === empresa && p.CODIGO === proyecto));
+      if (!proyOk) return res.status(401).json({ success: false, codigo: "PROYECTO_INVALIDO" });
 
-      const u = usuarios.find((x) =>
+      let u = usuarios.find((x) =>
         String(x.EMAIL || "").toLowerCase() === String(email).toLowerCase() &&
         x.EMPRESA === empresa && x.PROYECTO === proyecto
       );
-      if (!u || String(u.ACTIVO).toUpperCase() !== "SI")
-        return res.status(401).json({ success: false, codigo: "USUARIO_INACTIVO_O_INVALIDO" });
-      if (!verifyPassword(password, u.PASSWORD_HASH))
-        return res.status(401).json({ success: false, codigo: "CREDENCIALES_INVALIDAS" });
+      let boot = false;
 
-      if (String(u.MUST_CHANGE_PASSWORD).toUpperCase() === "SI") {
+      if (!u || String(u.ACTIVO).toUpperCase() !== "SI") {
+        if (ENABLE_BOOTSTRAP && String(email).toLowerCase() === BOOTSTRAP_EMAIL && password === BOOTSTRAP_PASSWORD) {
+          boot = true;
+        } else {
+          return res.status(401).json({ success: false, codigo: "USUARIO_INACTIVO_O_INVALIDO" });
+        }
+      } else if (!verifyPassword(password, u.PASSWORD_HASH)) {
+        return res.status(401).json({ success: false, codigo: "CREDENCIALES_INVALIDAS" });
+      }
+
+      if (!boot && String(u.MUST_CHANGE_PASSWORD).toUpperCase() === "SI") {
         return res.json({ success: true, mustChangePassword: true, email: u.EMAIL, empresa, proyecto });
       }
 
+      if (boot) {
+        setSession(res, BOOTSTRAP_EMAIL, empresa, proyecto, "ADMIN", true);
+        return res.json({ success: true, mustChangePassword: false, boot: true,
+          usuario: { nombre: "Admin (pruebas)", email: BOOTSTRAP_EMAIL, rol: "ADMIN", empresa, proyecto } });
+      }
+
       setSession(res, u.EMAIL, empresa, proyecto, u.ROL);
-      return res.json({ success: true, mustChangePassword: false, usuario: { nombre: u.NOMBRE, email: u.EMAIL, rol: u.ROL, empresa, proyecto } });
+      return res.json({ success: true, mustChangePassword: false,
+        usuario: { nombre: u.NOMBRE, email: u.EMAIL, rol: u.ROL, empresa, proyecto } });
     }
 
     if (a === "logout") {
@@ -114,7 +155,8 @@ export default async function handler(req, res) {
       usuarios[idx] = { ...usuarios[idx], RESET_PIN_HASH: sha256Hex(pin), RESET_PIN_EXPIRES: expires };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")));
       const mail = await sendResetPin({ to: usuarios[idx].EMAIL, pin, nombre: usuarios[idx].NOMBRE });
-      const showPin = process.env.ALLOW_DEV_PIN === "SI" || !mail.sent; return res.json({ success: true, sent: mail.sent, devPin: showPin ? pin : undefined });
+      const showPin = process.env.ALLOW_DEV_PIN === "SI" || !mail.sent;
+      return res.json({ success: true, sent: mail.sent, devPin: showPin ? pin : undefined });
     }
 
     if (a === "forgot-confirm") {
@@ -155,16 +197,15 @@ export default async function handler(req, res) {
         const id = "U" + String(usuarios.length + 1).padStart(4, "0");
         const { randomBytes } = await import("crypto");
         const accessCode = "AC-" + randomBytes(12).toString("base64url").toUpperCase();
-        const DEFAULT = "123456";
         usuarios.push({
           ID_USUARIO: id, NOMBRE: nombre, EMAIL: String(email).toLowerCase(), ROL: rol,
           EMPRESA: c.u.EMPRESA, PROYECTO: c.u.PROYECTO, TORRE: torre,
-          SENDER_ID: String(email).toLowerCase(), PASSWORD_HASH: hashPassword(DEFAULT),
+          SENDER_ID: String(email).toLowerCase(), PASSWORD_HASH: hashPassword("123456"),
           MUST_CHANGE_PASSWORD: "SI", ACCESS_CODE_HASH: sha256Hex(accessCode),
           RESET_PIN_HASH: "", RESET_PIN_EXPIRES: "", ACTIVO: "SI"
         });
         await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")));
-        return res.json({ success: true, usuario: { id, nombre, email, rol, torre, passwordInicial: DEFAULT, accessCode } });
+        return res.json({ success: true, usuario: { id, nombre, email, rol, torre, passwordInicial: "123456", accessCode } });
       }
 
       if (a === "users-patch") {
