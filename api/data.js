@@ -1,12 +1,60 @@
 import { readRows, appendRows, replaceRows } from "./_lib/sheets.js";
 import { HEADERS, VALORES, habilitado, UNIDAD_NIVEL } from "./_lib/model.js";
-import { currentUser } from "./_lib/session.js";
+import { currentUser, esDesarrollador } from "./_lib/session.js";
+import * as XLSX from "xlsx";
 
 // Tope de filas de REGISTRO enviadas al cliente en cada catálogo:
 // el histórico crece sin límite y el payload no debería.
 const MAX_REGISTRO = 2000;
 
 const ESTADOS_VALIDOS = new Set(Object.keys(VALORES));
+
+// Hojas del maestro y su clave unica por fila (para diff de importacion).
+const MAESTRO = {
+  EMPRESAS: { clave: (r) => r.CODIGO, soloDesarrollador: true },
+  PROYECTOS: { clave: (r) => r.EMPRESA + "|" + r.CODIGO, soloDesarrollador: true },
+  CAPITULOS: { clave: (r) => r.PROYECTO + "|" + r.CODIGO },
+  ACTIVIDADES: { clave: (r) => r.CODIGO },
+  NIVELES: { clave: (r) => r.PROYECTO + "|" + r.TORRE + "|" + r.NIVEL },
+  UNIDADES: { clave: (r) => r.PROYECTO + "|" + r.TORRE + "|" + r.NIVEL + "|" + r.UNIDAD },
+  CONTRATISTAS: { clave: (r) => r.CODIGO },
+  CONFIGURACION: { clave: (r) => r.PROYECTO + "|" + r.TORRE + "|" + r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD }
+};
+
+function normalizarHoja(nombre, filas) {
+  const headers = HEADERS[nombre];
+  return filas.map((f) => {
+    const o = {};
+    for (const h of headers) o[h] = String(f[h] ?? "").trim();
+    return o;
+  });
+}
+
+function diffHoja(actuales, importadas, claveFn) {
+  const mapAct = new Map(actuales.map((r) => [claveFn(r), r]));
+  const mapImp = new Map(importadas.map((r) => [claveFn(r), r]));
+  let nuevos = 0, modificados = 0, iguales = 0;
+  const clavesDuplicadas = importadas.length - mapImp.size;
+  for (const [k, r] of mapImp) {
+    const a = mapAct.get(k);
+    if (!a) nuevos++;
+    else if (JSON.stringify(a) !== JSON.stringify(r)) modificados++;
+    else iguales++;
+  }
+  const eliminados = [...mapAct.keys()].filter((k) => !mapImp.has(k)).length;
+  return { nuevos, modificados, iguales, eliminados, clavesDuplicadas };
+}
+
+function leerLibro(base64) {
+  const wb = XLSX.read(Buffer.from(base64, "base64"), { type: "buffer" });
+  const hojas = {};
+  for (const nombre of Object.keys(MAESTRO)) {
+    if (!wb.SheetNames.includes(nombre)) continue;
+    const json = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { defval: "" });
+    hojas[nombre] = normalizarHoja(nombre, json);
+  }
+  return hojas;
+}
 
 const num = (v) => { const n = parseFloat(String(v ?? "0").replace(",", ".")); return isNaN(n) ? 0 : n; };
 
@@ -219,6 +267,51 @@ export default async function handler(req, res) {
         .filter((h) => String(h.PROYECTO || "") === String(u.PROYECTO || ""))
         .map((h) => ({ fecha: h.FECHA, ambito: h.AMBITO, avance: num(h.AVANCE) }));
       return res.json({ success: true, puntos });
+    }
+
+    // ===== MAESTRO: exportar / previsualizar / importar =====
+    if (a === "maestro-export") {
+      if (String(u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const wb = XLSX.utils.book_new();
+      for (const nombre of Object.keys(MAESTRO)) {
+        const filas = await readRows(nombre);
+        const data = [HEADERS[nombre], ...filas.map((r) => HEADERS[nombre].map((h) => r[h] ?? ""))];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), nombre);
+      }
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="appcontrol-maestro.xlsx"');
+      return res.status(200).send(buf);
+    }
+
+    if (a === "maestro-preview" || a === "maestro-import") {
+      if (String(u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const esDev = esDesarrollador(u);
+      let hojas;
+      try { hojas = leerLibro(String((req.body || {}).dataBase64 || "")); }
+      catch { return res.status(400).json({ success: false, codigo: "ARCHIVO_INVALIDO" }); }
+      if (!Object.keys(hojas).length) return res.status(400).json({ success: false, codigo: "SIN_HOJAS_RECONOCIDAS" });
+
+      const resumen = {};
+      for (const [nombre, meta] of Object.entries(MAESTRO)) {
+        if (!hojas[nombre]) continue;
+        if (meta.soloDesarrollador && !esDev) { resumen[nombre] = { omitida: true }; continue; }
+        resumen[nombre] = diffHoja(await readRows(nombre), hojas[nombre], meta.clave);
+      }
+
+      if (a === "maestro-preview") return res.json({ success: true, resumen });
+
+      let tocadas = 0;
+      for (const [nombre, meta] of Object.entries(MAESTRO)) {
+        if (!hojas[nombre] || (meta.soloDesarrollador && !esDev)) continue;
+        const actuales = await readRows(nombre);
+        const d = resumen[nombre];
+        if (!d.nuevos && !d.modificados && !d.eliminados) continue;
+        const previas = actuales.length;
+        await replaceRows(nombre, HEADERS[nombre], hojas[nombre].map((r) => HEADERS[nombre].map((h) => r[h] ?? "")), previas);
+        tocadas++;
+      }
+      return res.json({ success: true, hojasActualizadas: tocadas, resumen });
     }
 
     res.status(400).json({ success: false, codigo: "ACCION_NO_VALIDA" });

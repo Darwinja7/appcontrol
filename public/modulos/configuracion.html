@@ -45,6 +45,12 @@ body::before{display:none}
     <button class="btn secondary" id="aCt">Asignar contratista</button>
     <button class="btn" id="save">Guardar cambios</button>
   </div>
+  <div class="actions">
+    <button class="btn secondary" id="mExp">Descargar maestro</button>
+    <button class="btn secondary" id="mImp">Importar maestro</button>
+    <input type="file" id="mFile" accept=".xlsx" style="display:none"/>
+    <span id="mEstado" style="font-size:12px;color:var(--mut);align-self:center"></span>
+  </div>
   <div class="gridwrap" id="box"></div>
   <div class="msg" id="m"></div>
 </div>
@@ -75,7 +81,47 @@ async function init() {
     $("#m").className = "msg " + (d.success ? "ok" : "err");
     render();
   };
+  $("#mExp").onclick = async () => {
+    mEstado("Generando maestro...");
+    try {
+      const r = await fetch("/api/data", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action:"maestro-export" }) });
+      if (!r.ok) throw new Error();
+      const b = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b);
+      a.download = "appcontrol-maestro.xlsx";
+      a.click(); URL.revokeObjectURL(a.href);
+      mEstado("Maestro descargado.");
+    } catch { mEstado("No fue posible descargar el maestro.", true); }
+  };
+  $("#mImp").onclick = () => $("#mFile").click();
+  $("#mFile").onchange = async () => {
+    const f = $("#mFile").files[0]; if (!f) return;
+    mEstado("Leyendo archivo...");
+    const buf = new Uint8Array(await f.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i += 8192) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 8192));
+    const b64 = btoa(bin);
+    const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"maestro-preview", dataBase64: b64 }) });
+    if (!d.success) { mEstado(traducirError(d.codigo), true); $("#mFile").value = ""; return; }
+    const lineas = Object.entries(d.resumen).map(([h, x]) =>
+      x.omitida ? `${h}: omitida (solo desarrollador)`
+        : `${h}: +${x.nuevos} nuevos · ~${x.modificados} modificados · -${x.eliminados} eliminados · =${x.iguales}` + (x.clavesDuplicadas ? ` · ¡${x.clavesDuplicadas} duplicados!` : ""));
+    if (!confirm("Resumen de importación:\n\n" + lineas.join("\n") + "\n\n¿Aplicar? Cada hoja reconocida se reemplaza con el contenido del archivo.")) {
+      mEstado("Importación cancelada."); $("#mFile").value = ""; return;
+    }
+    const r2 = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"maestro-import", dataBase64: b64 }) });
+    if (r2.success) { mEstado(`Importado: ${r2.hojasActualizadas} hoja(s) actualizada(s). Recargando...`); setTimeout(() => location.reload(), 1200); }
+    else mEstado(traducirError(r2.codigo), true);
+    $("#mFile").value = "";
+  };
 }
+function mEstado(t, err) { const e = $("#mEstado"); e.textContent = t; e.style.color = err ? "#EF4444" : ""; }
+function traducirErrorMaestro(codigo) {
+  const mapa = { ARCHIVO_INVALIDO: "El archivo no es un XLSX válido.", SIN_HOJAS_RECONOCIDAS: "El archivo no contiene hojas del maestro.", SOLO_ADMIN: "Solo ADMIN puede usar el maestro." };
+  return mapa[codigo] || codigo || "Error.";
+}
+const traducirError = traducirErrorMaestro;
 function torres() {
   const p = $("#proyecto").value;
   return [...new Set([
