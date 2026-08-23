@@ -1,34 +1,18 @@
 import { readRows, appendRows, replaceRows } from "./_lib/sheets.js";
 import { HEADERS, VALORES, habilitado } from "./_lib/model.js";
-import { parseCookies, verifyToken } from "./_lib/auth.js";
+import { currentUser } from "./_lib/session.js";
 
-function cookieHeader(req) {
-  if (req.headers && typeof req.headers.get === "function") return req.headers.get("cookie");
-  return req.headers?.cookie || "";
-}
+// Tope de filas de REGISTRO enviadas al cliente en cada catálogo:
+// el histórico crece sin límite y el payload no debería.
+const MAX_REGISTRO = 2000;
 
-async function current(req) {
-  const cookies = parseCookies(cookieHeader(req));
-  const p = verifyToken(cookies.appcontrol_session);
-  if (!p || p.scope !== "web") return null;
-  const usuarios = await readRows("USUARIOS");
-  const u = usuarios.find((x) =>
-    String(x.EMAIL || "").toLowerCase() === String(p.email || "").toLowerCase() &&
-    String(x.EMPRESA || "") === String(p.empresa || "") &&
-    String(x.PROYECTO || "") === String(p.proyecto || "")
-  ) || null;
-  if (u && String(u.ACTIVO).toUpperCase() === "SI") return u;
-  if (p.boot === true) {
-    return { ID_USUARIO: "BOOT", NOMBRE: "Admin (pruebas)", EMAIL: p.email, ROL: p.rol || "ADMIN",
-      EMPRESA: p.empresa, PROYECTO: p.proyecto, TORRE: "*", ACTIVO: "SI", SENDER_ID: p.email };
-  }
-  return null;
-}
+const ESTADOS_VALIDOS = new Set(Object.keys(VALORES));
 
 export default async function handler(req, res) {
   try {
-    const u = await current(req);
-    if (!u) return res.status(401).json({ error: "UNAUTHORIZED" });
+    const c = await currentUser(req);
+    if (!c) return res.status(401).json({ error: "UNAUTHORIZED" });
+    const u = c.u;
 
     const a = (req.body || {}).action || (req.query || {}).action || "catalogos";
 
@@ -37,8 +21,24 @@ export default async function handler(req, res) {
         readRows("PROYECTOS"), readRows("CAPITULOS"), readRows("ACTIVIDADES"),
         readRows("UNIDADES"), readRows("CONTRATISTAS"), readRows("CONFIGURACION"), readRows("REGISTRO")
       ]);
-      return res.json({ proyectos, capitulos, actividades, unidades, contratistas, configuracion, registro,
-        me: { rol: u.ROL, proyecto: u.PROYECTO, torre: u.TORRE, nombre: u.NOMBRE } });
+
+      // Aislamiento por tenant: cada usuario solo ve su empresa, su proyecto
+      // y —si su TORRE no es "*"— únicamente su torre.
+      const emp = String(u.EMPRESA || "");
+      const proy = String(u.PROYECTO || "");
+      const torre = String(u.TORRE || "*");
+      const enTorre = (r) => torre === "*" || String(r.TORRE || "") === torre;
+
+      return res.json({
+        proyectos: proyectos.filter((p) => String(p.EMPRESA || "") === emp && String(p.CODIGO || "") === proy),
+        capitulos: capitulos.filter((x) => String(x.PROYECTO || "") === proy),
+        actividades,
+        unidades: unidades.filter((x) => String(x.PROYECTO || "") === proy && enTorre(x)),
+        contratistas,
+        configuracion: configuracion.filter((r) => String(r.PROYECTO || "") === proy && enTorre(r)),
+        registro: registro.filter((r) => String(r.PROYECTO || "") === proy && enTorre(r)).slice(-MAX_REGISTRO),
+        me: { rol: u.ROL, proyecto: u.PROYECTO, torre: u.TORRE, nombre: u.NOMBRE, empresa: u.EMPRESA }
+      });
     }
 
     if (a === "config-save") {
@@ -57,9 +57,12 @@ export default async function handler(req, res) {
       const fecha = new Date().toISOString();
       const rows = [];
       for (const it of items) {
+        // El proyecto SIEMPRE viene del token, nunca del cliente.
+        // Estados fuera del catálogo se descartan.
+        if (!ESTADOS_VALIDOS.has(it.estado)) continue;
         const row = map.get([it.torre, it.actividad, it.nivel, it.unidad].join("|"));
         if (!row || !habilitado(row)) continue;
-        rows.push([fecha, it.proyecto, it.torre, row.CAPITULO, it.actividad, String(it.nivel), it.unidad,
+        rows.push([fecha, u.PROYECTO, it.torre, row.CAPITULO, it.actividad, String(it.nivel), it.unidad,
           it.estado, String(VALORES[it.estado] ?? 0), row.CONTRATISTA, u.SENDER_ID || u.EMAIL]);
       }
       if (rows.length) await appendRows("REGISTRO", HEADERS.REGISTRO, rows);
@@ -68,6 +71,7 @@ export default async function handler(req, res) {
 
     res.status(400).json({ success: false, codigo: "ACCION_NO_VALIDA" });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error("[api/data]", e);
+    res.status(500).json({ success: false, codigo: "ERROR_INTERNO" });
   }
 }
