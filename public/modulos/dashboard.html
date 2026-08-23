@@ -51,6 +51,7 @@ async function init() {
   D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) });
   for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); }
   fill($("#proyecto"), D.proyectos, (p) => ({ v: p.CODIGO, t: p.CODIGO }));
+  if ($("#proyecto").options.length > 1) { $("#proyecto").value = $("#proyecto").options[1].value; }
   ["proyecto", "torre", "capitulo", "contratista", "actividad"].forEach((id) => $("#" + id).onchange = compute);
   compute();
 }
