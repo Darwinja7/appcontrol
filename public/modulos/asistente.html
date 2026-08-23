@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Asistente IA</title>
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+body{background:transparent;padding:14px;overflow:auto;min-height:0}
+body::before{display:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.chat{display:flex;flex-direction:column;height:520px}
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid #202A36;border-radius:12px;background:#0B0F14}
+.burb{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.45;white-space:pre-wrap}
+.burb.user{align-self:flex-end;background:#31567C;color:#DCEAF7}
+.burb.bot{align-self:flex-start;background:#16202B;color:#EAF0F6;border:1px solid #202A36}
+.chatrow{display:flex;gap:8px;margin-top:10px}
+.mic{width:46px;height:46px;border-radius:50%;border:1px solid #202A36;background:#16202B;color:#FFB020;font-size:18px;cursor:pointer;flex:0 0 auto}
+.mic.rec{background:#7F1D1D;color:#fff;animation:pulso 1s infinite}
+@keyframes pulso{50%{opacity:.55}}
+.draft{margin-top:10px}
+table.grid{font-size:12px}
+.mini{font-size:11px;color:var(--mut)}
+.estado{padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="card" style="margin-top:0">
+  <div class="kicker">Impulsada por IA · opcional</div>
+  <h2 style="margin:6px 0 4px;font-size:22px">Asistente de obra</h2>
+  <p style="color:var(--mut);font-size:13px">Habla o escribe en natural: «muros terminados en dos niveles» y el asistente llena el registro. La IA es opcional; sin configurarla puedes usar el modo guiado de abajo.</p>
+
+  <div class="grid2">
+    <div class="card" style="margin:0">
+      <h3 style="font-size:15px;margin:0 0 8px">Tu proveedor de IA</h3>
+      <label>Proveedor</label><select id="prov"></select>
+      <label>Modelo</label><input id="modelo" placeholder="(por defecto del proveedor)"/>
+      <label>Base URL (solo personalizado)</label><input id="baseUrl" placeholder="https://.../v1"/>
+      <label>Llave API <span class="mini">(queda cifrada; vacío = conserva la actual)</span></label><input id="llave" type="password" placeholder="sk-..."/>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn" id="guardarCfg">Guardar</button>
+        <button class="btn secondary" id="probar">Probar conexión</button>
+      </div>
+      <div class="msg" id="mCfg"></div>
+      <p class="mini">Sin llave propia, AppControl usa la del servidor si existe (OpenRouter · modelo stealth ox-alpha en esfuerzo bajo).</p>
+    </div>
+
+    <div class="card chat" style="margin:0">
+      <h3 style="font-size:15px;margin:0 0 8px">Conversatorio de registro</h3>
+      <div class="msgs" id="msgs"></div>
+      <div class="chatrow">
+        <button class="mic" id="mic" title="Dictar por voz">🎤</button>
+        <input id="txt" placeholder='Ej: "muros terminados en T2 niveles 4 y 5"' style="margin:0"/>
+        <button class="btn" id="enviar" style="width:auto;margin:0">Enviar</button>
+      </div>
+      <div class="draft" id="draft"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="kicker">Sin IA también funciona</div>
+  <h3 style="font-size:15px;margin:6px 0 8px">Modo guiado: crear estructura</h3>
+  <div class="tools" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+    <div><label>Torre</label><input id="gTorre" value="T2" size="4"/></div>
+    <div><label>Aptos desde piso</label><input id="gDesde" type="number" value="4" size="3"/></div>
+    <div><label>hasta piso</label><input id="gHasta" type="number" value="21" size="3"/></div>
+    <div><label>Aptos por piso</label><input id="gAptos" type="number" value="6" size="3"/></div>
+    <div><label>Parqueaderos en pisos</label><input id="gPk" placeholder="2,3" size="6"/></div>
+    <div><label>Especiales (nivel:nombre:tipo)</label><input id="gEsp" placeholder="1:LOBBY:LOBBY,22:GYM:GYM" size="22"/></div>
+    <button class="btn secondary" id="gCrear">Crear niveles y unidades</button>
+  </div>
+  <div class="msg" id="mGuiado"></div>
+  <p class="mini">Idempotente: solo agrega lo que falte. Después habilita actividades en Configuración.</p>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+const PROVEEDORES = [
+  ["openrouter", "OpenRouter"], ["huggingface", "Hugging Face Router"], ["opencode", "OpenCode"],
+  ["orcarouter", "OrcaRouter"], ["openai", "OpenAI"], ["anthropic", "Anthropic"],
+  ["groq", "Groq"], ["personalizado", "Personalizado (compatible OpenAI)"]
+];
+let MENSAJES = [], ACCIONES = [];
+
+async function init() {
+  fill($("#prov"), PROVEEDORES.map(([v, t]) => ({ v, t })), (x) => x);
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"llm-config-get" }) });
+  if (d.success && d.config) {
+    $("#prov").value = d.config.proveedor || "openrouter";
+    $("#modelo").value = d.config.modelo || "";
+    $("#baseUrl").value = d.config.baseUrl || "";
+    if (d.config.llaveMascarada) msg($("#mCfg"), "Llave guardada: " + d.config.llaveMascarada, "ok");
+  }
+  agregarBot("Hola, dime qué quieres registrar. Ejemplo: «muros terminados en T2 niveles 4 y 5».");
+}
+
+$("#guardarCfg").onclick = async () => {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"llm-config-save", proveedor: $("#prov").value, modelo: $("#modelo").value.trim(), baseUrl: $("#baseUrl").value.trim(), llave: $("#llave").value.trim() }) });
+  d.success ? msg($("#mCfg"), "Configuración guardada (" + (d.llaveMascarada || "") + ").", "ok") : msg($("#mCfg"), traducir(d.codigo), true);
+};
+$("#probar").onclick = async () => {
+  msg($("#mCfg"), "Probando...");
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"llm-test" }) });
+  if (d.success) msg($("#mCfg"), `Conexión OK (${d.origen}, ${d.modelo}). Respuesta: ${d.respuesta}`, "ok");
+  else msg($("#mCfg"), d.codigo === "SIN_LLM" ? "Sin IA configurada ni respaldo de servidor." : "Fallo: " + (d.detalle || d.codigo), true);
+};
+
+$("#enviar").onclick = enviar;
+$("#txt").onkeydown = (e) => { if (e.key === "Enter") enviar(); };
+async function enviar() {
+  const t = $("#txt").value.trim(); if (!t) return;
+  $("#txt").value = "";
+  MENSAJES.push({ role:"user", content:t });
+  agregarBurb(t, "user");
+  agregarBurb("...", "bot");
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"wizard-chat", mensajes: MENSAJES }) });
+  $(".msgs").lastChild.remove();
+  if (!d.success) {
+    const texto = d.codigo === "SIN_LLM" ? "No hay IA configurada. Configura tu proveedor a la izquierda o usa el modo guiado." : "Error del proveedor: " + (d.detalle || d.codigo);
+    agregarBurb(texto, "bot"); return;
+  }
+  MENSAJES.push({ role:"assistant", content:d.mensaje });
+  agregarBurb(d.mensaje || "(sin mensaje)", "bot");
+  ACCIONES = Array.isArray(d.acciones) ? d.acciones : [];
+  pintarDraft();
+}
+
+function pintarDraft() {
+  if (!ACCIONES.length) { $("#draft").innerHTML = ""; return; }
+  let html = "<table class='grid'><tr><th>Actividad</th><th>Torre</th><th>Niveles</th><th>Estado</th></tr>";
+  let total = 0;
+  for (const a of ACCIONES) {
+    const nls = (a.niveles || []).join(", ");
+    const est = a.pct != null ? `<span class='estado' style='background:#31567C;color:#fff'>${a.pct}%</span>` : `<span class='estado' style='background:#245C43;color:#fff'>${esc(a.estado || "")}</span>`;
+    total += (a.niveles || []).length;
+    html += `<tr><td>${esc(a.actividad)}</td><td>${esc(a.torre)}</td><td>${esc(nls)}${a.unidad ? " · " + esc(a.unidad) : " (todas las unidades)"}</td><td>${est}</td></tr>`;
+  }
+  html += `</table><button class='btn' id='aplicar' style='margin-top:8px;width:auto'>Aplicar ${total} registro(s)</button>`;
+  $("#draft").innerHTML = html;
+  $("#aplicar").onclick = aplicar;
+}
+
+async function aplicar() {
+  const items = [];
+  for (const a of ACCIONES) {
+    for (const n of (a.niveles || [])) {
+      const base = { torre: String(a.torre), actividad: String(a.actividad), nivel: String(n), unidad: a.unidad ? String(a.unidad) : "NIVEL" };
+      items.push(a.pct != null ? { ...base, pct: a.pct } : { ...base, estado: a.estado });
+    }
+  }
+  if (!items.length) return;
+  const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"registro-save", items }) });
+  agregarBurb(d.success ? `Registrados ${d.registrados} avance(s).` : "El servidor rechazó parte del registro.", "bot");
+  if (d.success) { ACCIONES = []; pintarDraft(); }
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  const rec = new SR();
+  rec.lang = "es-CO"; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onresult = (e) => { $("#txt").value = e.results[0][0].transcript; };
+  rec.onend = () => $("#mic").classList.remove("rec");
+  rec.onerror = () => $("#mic").classList.remove("rec");
+  $("#mic").onclick = () => { if ($("#mic").classList.contains("rec")) { rec.stop(); return; } try { rec.start(); $("#mic").classList.add("rec"); } catch {} };
+} else $("#mic").style.display = "none";
+
+$("#gCrear").onclick = async () => {
+  const t = $("#gTorre").value.trim(); if (!t) return;
+  const desde = +$("#gDesde").value, hasta = +$("#gHasta").value, aptos = +$("#gAptos").value;
+  const pk = $("#gPk").value.split(",").map((x) => x.trim()).filter(Boolean);
+  const esp = $("#gEsp").value.split(",").map((x) => x.trim()).filter(Boolean).map((x) => { const [nivel, nombre, tipo] = x.split(":"); return { nivel, nombre, tipo }; });
+  const niveles = [], unidades = [];
+  const todos = new Set([String(desde), String(hasta), ...pk, ...esp.map((e) => String(e.nivel))]);
+  for (let p = desde; p <= hasta; p++) todos.add(String(p));
+  for (const n of [...todos].sort((a, b) => +a - +b)) niveles.push({ torre: t, nivel: n });
+  for (const e of esp) if (e.nombre) unidades.push({ torre: t, nivel: e.nivel, unidad: e.nombre, tipo: e.tipo || "ESPECIAL" });
+  for (const p of pk) for (let i = 1; i <= aptos; i++) unidades.push({ torre: t, nivel: p, unidad: `${p}0${i}`, tipo: "PARQUEADERO" });
+  for (let p = desde; p <= hasta; p++) for (let i = 1; i <= aptos; i++) unidades.push({ torre: t, nivel: String(p), unidad: `${p}${String(i).padStart(2, "0")}`, tipo: "APARTAMENTO" });
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"estructura-save", niveles, unidades }) });
+  if (d.success && d.agregados) msg($("#mGuiado"), `Creados: ${d.agregados.niveles} niveles, ${d.agregados.unidades} unidades.`, "ok");
+  else msg($("#mGuiado"), traducir(d.codigo), true);
+};
+
+function agregarBurb(t, quien) { const b = document.createElement("div"); b.className = "burb " + quien; b.textContent = t; $(".msgs").appendChild(b); $(".msgs").scrollTop = 1e9; }
+function agregarBot(t) { MENSAJES.push({ role:"assistant", content:t }); agregarBurb(t, "bot"); }
+function traducir(codigo) {
+  const mapa = { PROVEEDOR_INVALIDO: "Proveedor no reconocido.", DATOS_INCOMPLETOS: "Faltan datos.", SOLO_ADMIN: "Solo ADMIN.", DEMASIADOS_INTENTOS: "Espera un momento e intenta de nuevo." };
+  return mapa[codigo] || codigo || "Error.";
+}
+init();
+</script>
+</body>
+</html>

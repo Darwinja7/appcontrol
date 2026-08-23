@@ -54,6 +54,12 @@
         </svg>
         <span>Configuración</span>
       </a>
+      <a href="#" class="menu-item" data-mod="asistente">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>
+        </svg>
+        <span>Asistente IA</span>
+      </a>
       <a href="#" class="menu-item" data-mod="usuarios">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -127,7 +133,7 @@ async function checkAuth() {
 
 function loadModule(modName) {
   frame.src = `/modulos/${modName}.html`;
-  const names = { "registro": "Registro de Avance", "dashboard": "Dashboard & KPIs", "configuracion": "Configuración" };
+  const names = { "registro": "Registro de Avance", "dashboard": "Dashboard & KPIs", "configuracion": "Configuración", "asistente": "Asistente IA", "usuarios": "Usuarios" };
   title.textContent = names[modName] || modName;
   
   document.querySelectorAll(".menu-item").forEach(el => {

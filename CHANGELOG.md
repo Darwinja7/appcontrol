@@ -2,6 +2,21 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado: semver.
 
+## [1.9.0] - 2026-08-23
+### Added
+- Asistente IA opcional por administrador: módulo nuevo con configuración de proveedor (OpenRouter, Hugging Face, OpenCode, OrcaRouter, OpenAI, Anthropic, Groq y Personalizado compatible OpenAI). Llave cifrada con AES-256-GCM derivado de SESSION_SECRET; nunca vuelve al cliente.
+- Respaldo de servidor: si el admin no configura llave, se usa la variable del proveedor (ej. OPENROUTER_API_KEY) con modelo stealth ox-alpha en esfuerzo bajo.
+- Conversatorio de registro por texto o voz (Web Speech API es-CO): entiende sinónimos ("muros" = mampostería) y devuelve acciones verificables en borrador antes de aplicar.
+- Modo guiado sin IA: crea niveles/unidades idempotentemente (rango de pisos, aptos por piso, parqueaderos, especiales).
+- Acciones `llm-config-get/save/test`, `wizard-chat` y `estructura-save` con rate limiting.
+- Landing actualizada con mensaje de app impulsada por IA.
+## [1.8.0] - 2026-08-23
+### Added
+- Maestro exportar/importar: descarga XLSX con las 8 hojas de estructura+configuración; importación con vista previa de diff (nuevos/modificados/eliminados/duplicados) y confirmación. EMPRESAS/PROYECTOS solo para admin desarrollador.
+## [1.7.1] - 2026-08-23
+### Fixed
+- Actividades por nivel (estructura, movimiento de tierras): el backend expande un registro de nivel a todas sus unidades activas (mismo avance); calcularAvance y dashboard promedian el nivel desde sus unidades. Columna APLICACION en ACTIVIDADES.
+- Registro: porcentaje manual 0-100 por celda (estado "Manual") y botón ✓ de realizado; el avance ponderado usa VALOR para manuales.
 ## [1.7.0] - 2026-08-23
 ### Added
 - Registro móvil táctil: tocar una celda cicla el estado (con color y % al instante), long-press selecciona unidades para aplicar en lote, botón Deshacer y contador de cambios sin guardar.

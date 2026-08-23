@@ -9,6 +9,9 @@ import {
   currentUser, bootstrapOk, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD,
   SYNTH_EMPRESAS, SYNTH_PROYECTOS, esDesarrollador
 } from "./_lib/session.js";
+import { cifrarLlave, mascararLlave } from "./_lib/crypto-llm.js";
+import { resolverProveedor } from "./_lib/llm-providers.js";
+import { resolverLlm, chatLlm, promptSistema, parseRespuestaLlm } from "./_lib/llm.js";
 
 const ROLES_VALIDOS = ["ADMIN", "RESIDENTE", "VISUALIZADOR"];
 
@@ -211,6 +214,174 @@ export default async function handler(req, res) {
       usuarios[idx] = { ...u, PASSWORD_HASH: hashPassword(newPassword), MUST_CHANGE_PASSWORD: "NO", RESET_PIN_HASH: "", RESET_PIN: "", RESET_PIN_EXPIRES: "" };
       await replaceRows("USUARIOS", HEADERS.USUARIOS, usuarios.map((r) => HEADERS.USUARIOS.map((h) => r[h] ?? "")), usuarios.length);
       return res.json({ success: true });
+    }
+
+    // ===== Asistente IA (opcional) =====
+    if (a === "llm-config-get") {
+      const c = await currentUser(req);
+      if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const filas = await readRows("LLM_CONFIG");
+      const fila = filas.find((f) => String(f.EMAIL || "").toLowerCase() === String(c.u.EMAIL || "").toLowerCase());
+      return res.json({
+        success: true,
+        config: fila ? {
+          proveedor: fila.PROVEEDOR, modelo: fila.MODELO, baseUrl: fila.BASE_URL,
+          llaveMascarada: mascararLlave(fila.KEY_ENC ? "configurada-llave" : "")
+        } : null
+      });
+    }
+
+    if (a === "llm-config-save") {
+      const c = await currentUser(req);
+      if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const { proveedor = "", modelo = "", baseUrl = "", llave = "" } = b;
+      const prov = resolverProveedor(proveedor);
+      if (!prov) return res.status(400).json({ success: false, codigo: "PROVEEDOR_INVALIDO" });
+      if (proveedor === "personalizado" && !baseUrl) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
+      const filas = await readRows("LLM_CONFIG");
+      const idx = filas.findIndex((f) => String(f.EMAIL || "").toLowerCase() === String(c.u.EMAIL || "").toLowerCase());
+      const fila = {
+        EMAIL: c.u.EMAIL,
+        PROVEEDOR: proveedor,
+        MODELO: modelo || prov.modeloDefault,
+        BASE_URL: baseUrl || prov.baseUrl,
+        KEY_ENC: llave ? cifrarLlave(llave) : (idx >= 0 ? filas[idx].KEY_ENC : ""),
+        ACTUALIZADO: new Date().toISOString()
+      };
+      if (idx >= 0) filas[idx] = fila; else filas.push(fila);
+      await replaceRows("LLM_CONFIG", HEADERS.LLM_CONFIG, filas.map((r) => HEADERS.LLM_CONFIG.map((h) => r[h] ?? "")), filas.length);
+      return res.json({ success: true, llaveMascarada: mascararLlave(llave || "configurada") });
+    }
+
+    if (a === "llm-test") {
+      const c = await currentUser(req);
+      if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      if (!limitar(`llm-test:${c.u.EMAIL}`, 10, 60_000)) return res.status(429).json({ success: false, codigo: "DEMASIADOS_INTENTOS" });
+      const cfgLlm = await resolverLlm(c.u);
+      if (!cfgLlm) return res.json({ success: false, codigo: "SIN_LLM", detalle: "Configura tu proveedor o define la variable de entorno del servidor." });
+      const r = await chatLlm(cfgLlm, [{ role: "user", content: "Responde solo con: OK" }], { maxTokens: 10, timeoutMs: 20000 });
+      return res.json(r.ok ? { success: true, respuesta: r.texto.slice(0, 50), origen: cfgLlm.origen, modelo: cfgLlm.modelo }
+        : { success: false, codigo: "FALLO_PROVEEDOR", detalle: r.error });
+    }
+
+    if (a === "wizard-chat") {
+      const c = await currentUser(req);
+      if (!c || String(c.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      if (!limitar(`wizard:${c.u.EMAIL}`, 20, 60_000)) return res.status(429).json({ success: false, codigo: "DEMASIADOS_INTENTOS" });
+      const cfgLlm = await resolverLlm(c.u);
+      if (!cfgLlm) return res.json({ success: false, codigo: "SIN_LLM" });
+      const mensajesEntrantes = Array.isArray(b.mensajes) ? b.mensajes.slice(-12)
+        .filter((m) => m && typeof m.content === "string")
+        .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content.slice(0, 800) })) : [];
+      if (!mensajesEntrantes.length) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
+
+      const [acts, caps, nivs, uns, cts] = await Promise.all([
+        readRows("ACTIVIDADES"), readRows("CAPITULOS"), readRows("NIVELES"), readRows("UNIDADES"), readRows("CONTRATISTAS")
+      ]);
+      const torresProy = [...new Set([
+        ...nivs.filter((x) => x.PROYECTO === c.u.PROYECTO).map((x) => x.TORRE),
+        ...uns.filter((x) => x.PROYECTO === c.u.PROYECTO).map((x) => x.TORRE)
+      ])].filter(Boolean);
+      const nivelesResumen = torresProy.map((t) => {
+        const ns = [...new Set(nivs.filter((x) => x.PROYECTO === c.u.PROYECTO && x.TORRE === t).map((x) => String(x.NIVEL)))].sort((p, q) => +p - +q);
+        return `${t}: ${ns.length ? ns.join(",") : "sin niveles"}`;
+      }).join(" | ");
+      const actsProy = acts.filter((x) => String(x.ACTIVO).toUpperCase() === "SI");
+      const capsProy = caps.filter((x) => x.PROYECTO === c.u.PROYECTO);
+      const codigosCap = new Set(capsProy.map((x) => x.CODIGO));
+      const actsDelProyecto = actsProy.filter((x) => codigosCap.has(x.CAPITULO));
+
+      const sistema = promptSistema({
+        proyecto: `${c.u.PROYECTO} (${c.u.EMPRESA})`,
+        torres: torresProy,
+        nivelesResumen,
+        actividades: actsDelProyecto,
+        capitulos: capsProy,
+        contratistas: cts.filter((x) => String(x.ACTIVO).toUpperCase() === "SI")
+      });
+      const r = await chatLlm(cfgLlm, [{ role: "system", content: sistema }, ...mensajesEntrantes]);
+      if (!r.ok) return res.json({ success: false, codigo: "FALLO_PROVEEDOR", detalle: r.error });
+      const parsed = parseRespuestaLlm(r.texto);
+      return res.json({
+        success: true,
+        mensaje: String(parsed.mensaje || "").slice(0, 800),
+        acciones: Array.isArray(parsed.acciones) ? parsed.acciones.filter((x) => x && x.tipo === "avance").slice(0, 30) : []
+      });
+    }
+
+    // Estructura guiada: crea niveles/unidades/actividades/configuracion que
+    // falten (idempotente por clave). Solo ADMIN; proyecto destino = el propio
+    // salvo admin desarrollador con empresa/proyecto explicitos.
+    if (a === "estructura-save") {
+      const c2 = await currentUser(req);
+      if (!c2 || String(c2.u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const esDev = esDesarrollador(c2.u);
+      const empDestino = esDev && b.empresa ? String(b.empresa) : c2.u.EMPRESA;
+      const proyDestino = esDev && b.proyecto ? String(b.proyecto) : c2.u.PROYECTO;
+      if (!(await destinoValido(empDestino, proyDestino))) return res.status(400).json({ success: false, codigo: "PROYECTO_INVALIDO" });
+      const hoyIso = new Date().toISOString().slice(0, 10);
+
+      const nivelesIn = Array.isArray(b.niveles) ? b.niveles : [];
+      const unidadesIn = Array.isArray(b.unidades) ? b.unidades : [];
+      const actividadesIn = Array.isArray(b.actividades) ? b.actividades : [];
+      const configIn = Array.isArray(b.configuracion) ? b.configuracion : [];
+
+      let agregados = { niveles: 0, unidades: 0, actividades: 0, configuracion: 0 };
+
+      if (nivelesIn.length) {
+        const actuales = await readRows("NIVELES");
+        const claves = new Set(actuales.map((r) => [r.PROYECTO, r.TORRE, String(r.NIVEL)].join("|")));
+        const nuevas = nivelesIn
+          .filter((x) => x.torre && x.nivel !== undefined && x.nivel !== "")
+          .filter((x) => !claves.has([proyDestino, String(x.torre), String(x.nivel)].join("|")))
+          .map((x) => [proyDestino, String(x.torre), String(x.nivel), x.especial ? "SI" : "NO"]);
+        if (nuevas.length) await appendRows("NIVELES", HEADERS.NIVELES, nuevas);
+        agregados.niveles = nuevas.length;
+      }
+
+      if (unidadesIn.length) {
+        const actuales = await readRows("UNIDADES");
+        const claves = new Set(actuales.map((r) => [r.PROYECTO, r.TORRE, String(r.NIVEL), r.UNIDAD].join("|")));
+        const nuevas = unidadesIn
+          .filter((x) => x.torre && x.unidad)
+          .filter((x) => !claves.has([proyDestino, String(x.torre), String(x.nivel ?? ""), String(x.unidad)].join("|")))
+          .map((x) => [proyDestino, String(x.torre), String(x.nivel ?? ""), String(x.unidad), String(x.tipo || "APARTAMENTO"), "SI"]);
+        if (nuevas.length) await appendRows("UNIDADES", HEADERS.UNIDADES, nuevas);
+        agregados.unidades = nuevas.length;
+      }
+
+      if (actividadesIn.length) {
+        const actuales = await readRows("ACTIVIDADES");
+        const claves = new Set(actuales.map((r) => r.CODIGO));
+        const nuevas = actividadesIn
+          .filter((x) => x.codigo && !claves.has(String(x.codigo)))
+          .map((x) => [String(x.codigo), String(x.nombre || x.codigo), String(x.capitulo || ""), String(x.ponderacion ?? ""), "SI",
+            String(x.aplicacion || "UNIDAD").toUpperCase() === "NIVEL" ? "NIVEL" : "UNIDAD"]);
+        if (nuevas.length) await appendRows("ACTIVIDADES", HEADERS.ACTIVIDADES, nuevas);
+        agregados.actividades = nuevas.length;
+      }
+
+      if (configIn.length) {
+        const [cfgActuales, actsTodas] = await Promise.all([readRows("CONFIGURACION"), readRows("ACTIVIDADES")]);
+        const infoAct = new Map(actsTodas.map((x) => [x.CODIGO, x]));
+        const claves = new Set(cfgActuales.map((r) => [r.PROYECTO, r.TORRE, r.ACTIVIDAD, String(r.NIVEL), r.UNIDAD].join("|")));
+        const nuevas = [];
+        for (const x of configIn) {
+          if (!x.torre || !x.actividad || x.nivel === undefined) continue;
+          const clave = [proyDestino, String(x.torre), String(x.actividad), String(x.nivel), String(x.unidad || "NIVEL")].join("|");
+          if (claves.has(clave)) continue;
+          const info = infoAct.get(String(x.actividad));
+          const aplica = "SI", activo = "SI";
+          const ct = String(x.contratista || "Sin asignar");
+          const habilitadoSi = aplica === "SI" && activo === "SI" && ct !== "Sin asignar" && ct !== "";
+          nuevas.push([proyDestino, String(x.torre), String(x.actividad), info ? info.CAPITULO : "", String(x.nivel),
+            String(x.unidad || "NIVEL"), aplica, activo, ct, habilitadoSi ? "SI" : "NO", hoyIso, "", ""]);
+        }
+        if (nuevas.length) await appendRows("CONFIGURACION", HEADERS.CONFIGURACION, nuevas);
+        agregados.configuracion = nuevas.length;
+      }
+
+      return res.json({ success: true, agregados });
     }
 
     // Torres disponibles de un proyecto (selects de asignacion de usuarios).

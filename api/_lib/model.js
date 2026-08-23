@@ -31,6 +31,10 @@ export const HEADERS = {
 
   CONTRATISTAS: ["CODIGO","NOMBRE","ACTIVO"],
 
+  // Configuracion LLM por administrador (opcional). KEY_ENC va cifrada con
+  // AES-256-GCM derivado de SESSION_SECRET; jamas vuelve al cliente.
+  LLM_CONFIG: ["EMAIL","PROVEEDOR","MODELO","BASE_URL","KEY_ENC","ACTUALIZADO"],
+
   CONFIGURACION: [
     "PROYECTO",
     "TORRE",
