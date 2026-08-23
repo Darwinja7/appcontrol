@@ -88,5 +88,6 @@ export async function replaceRows(sheet, header, rows, filasPrevias) {
 export async function appendRows(sheet, header, rows) {
   await ensureSheet(sheet);
   const last = colLetter(header.length);
-  await req("POST", `/values/${encodeURIComponent(sheet)}!A:${last}?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { values: rows });
+  // El endpoint de append requiere el sufijo ":append" sobre el rango.
+  await req("POST", `/values/${encodeURIComponent(sheet)}!A:${last}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { values: rows });
 }
