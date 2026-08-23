@@ -142,3 +142,11 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
 - Demo P000/T2: 23 niveles, 127 unidades (lobby, pk pisos 2-3, aptos 401-2106, amenidades).
 - Scripts test: check-inline, relaciones, registro, usuarios-tenant, por-nivel, expansion-nivel, maestro, llm.
 - Pendiente E2E con sesion del usuario: matriz completa (crear usuario combos, wizard con llave real, maestro roundtrip, voz en Chrome Android).
+
+## Cierre E2E v1.9.1 (2026-08-23)
+
+- Matriz API completa PASS: login, torres-list, reglas de torre/rol, tenant lock 403, SOLO_DESARROLLADOR, SIN_LLM neutral, BYOK save/test (origen=propia, stealth/ox-alpha), wizard-chat con sinonimo muros->mamposteria y pregunta de clarificacion, estructura-save habilito ACT010/011 T2 niv4-5, registro-save expandio 24 filas por unidad. Export maestro genero XLSX real de 8 hojas.
+- Bugs corregidos en el loop: slug OpenRouter (stealth/ox-alpha sin prefijo), appendRows sin importar en auth.js, mensaje SIN_LLM neutral.
+- QA: cuenta qa.matrix y fila LLM_CONFIG eliminadas tras las pruebas; quedan registros demo Listo en REGISTRO (T2 niv4-5 ACT010/011) como data de ejemplo.
+- Nueva skill compartida: agente-conversacional-modulos (en darwin-dotfiles, junction a ~/.claude/skills) — patron BYOK reutilizable.
+- Pendiente: verificacion visual browser-harness (tap cicla colores, voz en Chrome Android) y prueba de import maestro desde la UI.
