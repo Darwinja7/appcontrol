@@ -1,0 +1,42 @@
+export async function sendResetPin({ to, pin, nombre }) {
+  if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM) {
+    console.warn("MAIL_NOT_CONFIGURED PIN:", pin, "TO:", to);
+    return { sent: false, reason: "MAIL_NOT_CONFIGURED" };
+  }
+
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;background:#0B0F14;color:#EAF0F6;padding:24px">
+      <div style="max-width:520px;margin:auto;background:#10151C;border:1px solid #202A36;border-radius:16px;padding:28px">
+        <h2 style="margin:0 0 12px;color:#FFB020">AppControl</h2>
+        <p>Hola ${nombre || ""},</p>
+        <p>Tu PIN para recuperar contraseña es:</p>
+        <div style="font-size:32px;font-weight:800;letter-spacing:8px;background:#0B0F14;border:1px solid #202A36;border-radius:12px;padding:18px;text-align:center;color:#FFB020">
+          ${pin}
+        </div>
+        <p style="color:#93A1B0">Este PIN vence en 2 minutos. Si no lo solicitaste, ignora este mensaje.</p>
+      </div>
+    </div>
+  `;
+
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: process.env.MAIL_FROM,
+      to,
+      subject: "PIN de recuperación AppControl",
+      html
+    })
+  });
+
+  if (!r.ok) {
+    const txt = await r.text();
+    console.error("RESEND_ERROR", txt);
+    return { sent: false, reason: txt };
+  }
+
+  return { sent: true };
+}

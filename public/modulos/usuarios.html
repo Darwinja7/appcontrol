@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Usuarios</title>
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+body{background:transparent;padding:14px;overflow:auto;min-height:0}
+body::before{display:none}
+.tools{display:grid;grid-template-columns:1.2fr 1.3fr .8fr .7fr auto;gap:10px;align-items:end;margin:16px 0}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.on{background:rgba(47,191,113,.14);color:#2FBF71}.off{background:rgba(239,68,68,.14);color:#EF4444}
+@media(max-width:850px){.tools{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="card" style="margin-top:0">
+  <div class="kicker">Administración</div>
+  <h2 style="margin:6px 0 4px;font-size:22px">Usuarios y permisos</h2>
+  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores. Todos entran inicialmente con contraseña 123456 y deben cambiarla.</p>
+
+  <div class="tools">
+    <div><label>Nombre</label><input id="nombre" placeholder="Nombre completo"/></div>
+    <div><label>Correo</label><input id="email" type="email" placeholder="correo@empresa.com"/></div>
+    <div><label>Rol</label><select id="rol"><option>RESIDENTE</option><option>VISUALIZADOR</option><option>ADMIN</option></select></div>
+    <div><label>Torre</label><input id="torre" value="T1"/></div>
+    <button class="btn" id="crear">Crear usuario</button>
+  </div>
+
+  <div class="msg" id="m"></div>
+  <div class="gridwrap" id="tabla"></div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+async function cargar() {
+  const d = await api("/api/users");
+  if (!d.success) {
+    document.querySelector(".card").innerHTML = "<p class='msg err'>Solo ADMIN puede administrar usuarios.</p>";
+    return;
+  }
+
+  let html = "<table class='grid'><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Torre</th><th>Estado</th><th>Acciones</th></tr>";
+
+  for (const u of d.usuarios) {
+    html += `<tr>
+      <td>${u.NOMBRE}</td>
+      <td>${u.EMAIL}</td>
+      <td>${u.ROL}</td>
+      <td>${u.TORRE}</td>
+      <td><span class='badge ${u.ACTIVO === "SI" ? "on" : "off"}'>${u.ACTIVO === "SI" ? "ACTIVO" : "INACTIVO"}</span></td>
+      <td>
+        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' onclick='toggle("${u.EMAIL}","${u.ACTIVO === "SI" ? "NO" : "SI"}")'>${u.ACTIVO === "SI" ? "Desactivar" : "Activar"}</button>
+        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' onclick='resetPass("${u.EMAIL}")'>Reset 123456</button>
+      </td>
+    </tr>`;
+  }
+
+  html += "</table>";
+  $("#tabla").innerHTML = html;
+}
+
+$("#crear").onclick = async () => {
+  const body = {
+    nombre: $("#nombre").value.trim(),
+    email: $("#email").value.trim(),
+    rol: $("#rol").value,
+    torre: $("#torre").value.trim() || "*"
+  };
+
+  const d = await api("/api/users", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  if (d.success) {
+    $("#m").className = "msg ok";
+    $("#m").innerHTML = `Usuario creado.<br>
+      Correo: <b>${d.usuario.email}</b><br>
+      Contraseña inicial: <b>${d.usuario.passwordInicial}</b><br>
+      Código de acceso generado: <b>${d.usuario.accessCode}</b><br>
+      En la hoja solo queda guardado en hash.`;
+    $("#nombre").value = "";
+    $("#email").value = "";
+    cargar();
+  } else {
+    $("#m").className = "msg err";
+    $("#m").textContent = d.codigo || "Error creando usuario.";
+  }
+};
+
+window.toggle = async (email, activo) => {
+  await api("/api/users", {
+    method: "PATCH",
+    body: JSON.stringify({ email, activo })
+  });
+  cargar();
+};
+
+window.resetPass = async (email) => {
+  await api("/api/users", {
+    method: "PATCH",
+    body: JSON.stringify({ email, resetPassword: true })
+  });
+  alert("Contraseña reiniciada a 123456. El usuario deberá cambiarla al entrar.");
+  cargar();
+};
+
+cargar();
+</script>
+</body>
+</html>
