@@ -7,52 +7,81 @@
 <meta name="theme-color" content="#0B0F14"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <title>Registro</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/main.css"/>
 <style>
 body{background:transparent;padding:14px;overflow:auto;min-height:0}
 body::before{display:none}
-label.cell{display:inline-flex;flex-direction:column;gap:3px;align-items:center;cursor:pointer;border-radius:12px;padding:8px 6px;border:1px solid transparent;background:#16202B;transition:.3s}
-label.cell input{width:auto;accent-color:var(--amber)}
+label.cell{display:inline-flex;flex-direction:column;gap:3px;align-items:center;cursor:pointer;border-radius:12px;padding:8px 6px;border:2px solid transparent;background:#16202B;transition:.25s;-webkit-tap-highlight-color:transparent;user-select:none}
 label.cell:hover{transform:scale(1.05);border-color:#1D3552}
-label.cell:has(input:checked){border-color:var(--amber);background:rgba(255,176,32,.08);box-shadow:0 0 14px rgba(255,176,32,.35)}
-label.cell .chip{min-width:54px;text-align:center}
+label.cell input{display:none}
+label.cell.sel{border-color:var(--amber);background:rgba(255,176,32,.08);box-shadow:0 0 14px rgba(255,176,32,.35)}
+label.cell.pend{border-style:dashed;border-color:var(--amber)}
+label.cell .pct{font-size:11px;font-weight:800;color:#EAF0F6;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+label.cell .chip{min-width:54px;text-align:center;pointer-events:none}
+.avbar{height:8px;border-radius:6px;background:#202A36;overflow:hidden;min-width:52px}
+.avbar i{display:block;height:100%;border-radius:6px}
 .sel-count{background:var(--amber);color:#000;padding:2px 8px;border-radius:10px;font-size:12px}
+.pend-count{background:#31567C;color:#DCEAF7;padding:2px 8px;border-radius:10px;font-size:12px}
+.legend{display:flex;gap:10px;margin:10px 0;font-size:11px;color:var(--mut);flex-wrap:wrap;align-items:center}
+.legend .chip{cursor:default;pointer-events:none}
+.hint{color:var(--mut);font-size:12px;margin-top:4px}
 </style>
 </head>
 <body>
 <div class="card" style="margin-top:0">
   <div class="kicker">Registro de avance</div>
   <label>Actividad (solo habilitadas)</label><select id="actividad"></select>
+  <div class="legend">
+    <span class="chip st0">Sin empezar 0%</span>
+    <span class="chip st1">Replanteo 10%</span>
+    <span class="chip st2">En curso 50%</span>
+    <span class="chip st3">Remate 80%</span>
+    <span class="chip st4">Listo 100%</span>
+  </div>
+  <div class="hint">Toca una celda para avanzar su estado · mantén pulsada para seleccionar varias</div>
   <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
-    <span style="color:var(--mut);font-size:13px">Marca unidades y elige estado</span>
+    <span id="pend-badge" class="pend-count" style="display:none"></span>
     <span id="sel-badge" class="sel-count" style="display:none">0</span>
   </div>
 </div>
 <div class="card" style="padding:0;overflow:hidden">
   <div class="gridwrap" id="box"></div>
 </div>
-<div style="position:sticky;bottom:0;padding:10px 0;z-index:50">
+<div style="position:sticky;bottom:0;padding:10px 0;z-index:50;background:transparent">
   <div style="display:flex;gap:10px">
     <select id="estado" style="flex:1;margin:0"></select>
+    <button class="btn secondary" id="undo" style="flex:0 0 auto;margin:0;width:auto;display:none">Deshacer</button>
     <button class="btn" id="save" style="flex:1;margin:0;width:auto">Guardar</button>
   </div>
 </div>
 <script src="/js/app.js"></script>
 <script>
-let D = null, LAST = new Map(), SEL = new Set();
+let D = null, LAST = new Map(), SEL = new Set(), PEND = new Map();
+const siguiente = (st) => ESTADOS[(ESTADOS.indexOf(st) + 1) % ESTADOS.length];
+const colorAv = (v) => v <= 0 ? "#2A3138" : v < 0.15 ? "#5E3732" : v < 0.55 ? "#6E5620" : v < 0.85 ? "#31567C" : "#245C43";
+
 async function init() {
   D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) });
   rebuildLast();
   const acts = [...new Set(cfgHab().map((r) => r.ACTIVIDAD))];
   fill($("#actividad"), acts.map((a) => ({ CODIGO: a })), (x) => ({ v: x.CODIGO, t: x.CODIGO }));
   fill($("#estado"), ESTADOS, (e) => ({ v: e, t: e }));
-  $("#actividad").onchange = () => { SEL.clear(); render(); };
+  $("#actividad").onchange = () => { SEL.clear(); PEND.clear(); render(); };
   $("#save").onclick = guardar;
+  $("#undo").onclick = deshacer;
   if (acts.length) { $("#actividad").value = acts[0]; render(); }
 }
 function rebuildLast() { LAST = new Map(); for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); } }
 function cfgHab() { return D.configuracion.filter((r) => r.APLICA === "SI" && r.ACTIVO === "SI" && r.CONTRATISTA && r.CONTRATISTA !== "Sin asignar"); }
+
+function estadoEfectivo(a, n, u) {
+  const k = n + "|" + u;
+  if (PEND.has(a + "|" + k)) return PEND.get(a + "|" + k);
+  const last = LAST.get(a + "|" + k);
+  return last ? last.ESTADO : "Sin empezar";
+}
+
 function render() {
   const a = $("#actividad").value; if (!a) return;
   const cells = cfgHab().filter((r) => r.ACTIVIDAD === a);
@@ -64,32 +93,88 @@ function render() {
     for (const u of cols) {
       const c = cells.find((r) => r.NIVEL === n && r.UNIDAD === u);
       if (!c) { tds += "<td></td>"; continue; }
-      const last = LAST.get(a + "|" + n + "|" + u);
-      const st = last ? last.ESTADO : "Sin empezar";
+      const st = estadoEfectivo(a, n, u);
       vals.push(VALOR[st] ?? 0);
       const k = n + "|" + u;
-      tds += `<td><label class='cell'><input type='checkbox' ${SEL.has(k) ? "checked" : ""} data-k='${esc(k)}'/><span class='chip st${ESTADOS.indexOf(st)}'>${esc(st.substring(0, 3))}</span></label></td>`;
+      const pend = PEND.has(a + "|" + k);
+      tds += `<td><label class='cell ${SEL.has(k) ? "sel" : ""} ${pend ? "pend" : ""}' data-k='${esc(k)}' data-st='${esc(st)}'>` +
+        `<span class='chip st${ESTADOS.indexOf(st)}'>${esc(st.substring(0, 3))}</span>` +
+        `<span class='pct'>${Math.round((VALOR[st] ?? 0) * 100)}%</span>` +
+        `</label></td>`;
     }
-    const avg = vals.length ? Math.round((vals.reduce((x, y) => x + y, 0) / vals.length) * 100) : 0;
-    html += `<tr><td class='lvl'>${esc(n)}</td><td class='av'>${avg}%</td>` + tds + "</tr>";
+    const avg = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
+    html += `<tr><td class='lvl'>${esc(n)}</td>` +
+      `<td><div class='avbar'><i style='width:${Math.round(avg * 100)}%;background:${colorAv(avg)}'></i></div>` +
+      `<span style='font-size:11px;color:var(--mut)'>${Math.round(avg * 100)}%</span></td>` + tds + "</tr>";
   }
   html += "</table>";
   $("#box").innerHTML = html;
-  $("#box").querySelectorAll("input[type=checkbox]").forEach((c) => c.onchange = () => { c.checked ? SEL.add(c.dataset.k) : SEL.delete(c.dataset.k); updateBadge(); });
-  updateBadge();
+
+  $("#box").querySelectorAll("label.cell").forEach((el) => {
+    let timer = null, largo = false;
+    const k = el.dataset.k;
+    el.addEventListener("touchstart", () => { largo = false; timer = setTimeout(() => { largo = true; toggleSel(k); }, 450); }, { passive: true });
+    ["touchend", "touchmove", "touchcancel"].forEach((ev) => el.addEventListener(ev, () => clearTimeout(timer), { passive: true }));
+    el.addEventListener("contextmenu", (e) => { e.preventDefault(); toggleSel(k); });
+    el.addEventListener("click", () => {
+      if (largo) { largo = false; return; }
+      ciclar(k, el.dataset.st);
+    });
+  });
+  updateBadges();
 }
-function updateBadge() { const b = $("#sel-badge"); if (SEL.size) { b.style.display = "inline-block"; b.textContent = SEL.size; } else b.style.display = "none"; }
+
+function ciclar(k, stActual) {
+  const a = $("#actividad").value;
+  const nuevo = siguiente(stActual);
+  PEND.set(a + "|" + k, nuevo);
+  SEL.delete(k);
+  render();
+}
+
+function toggleSel(k) {
+  SEL.has(k) ? SEL.delete(k) : SEL.add(k);
+  render();
+}
+
+function updateBadges() {
+  const pb = $("#pend-badge"), sb = $("#sel-badge");
+  if (PEND.size) { pb.style.display = "inline-block"; pb.textContent = PEND.size + " cambio" + (PEND.size > 1 ? "s" : "") + " sin guardar"; }
+  else pb.style.display = "none";
+  if (SEL.size) { sb.style.display = "inline-block"; sb.textContent = "Sel: " + SEL.size; }
+  else sb.style.display = "none";
+  $("#undo").style.display = PEND.size ? "" : "none";
+}
+
+function deshacer() { PEND.clear(); render(); }
+
 async function guardar() {
-  const a = $("#actividad").value, est = $("#estado").value;
-  if (!a || !est || !SEL.size) { alert("Selecciona actividad, estado y al menos una unidad."); return; }
-  const sample = cfgHab().find((r) => r.ACTIVIDAD === a);
-  const items = [...SEL].map((k) => { const [n, u] = k.split("|"); return { proyecto: sample.PROYECTO, torre: sample.TORRE, actividad: a, nivel: n, unidad: u, estado: est }; });
+  const a = $("#actividad").value;
+  if (!a) return;
+  if (!PEND.size && !SEL.size) { alert("No hay cambios que guardar."); return; }
+  const sampleDe = (act) => cfgHab().find((r) => r.ACTIVIDAD === act);
+  let items = [];
+  for (const [ak, est] of PEND) {
+    const i1 = ak.indexOf("|"), i2 = ak.indexOf("|", i1 + 1);
+    const actId = ak.slice(0, i1), n = ak.slice(i1 + 1, i2), u = ak.slice(i2 + 1);
+    const s = sampleDe(actId); if (!s) continue;
+    items.push({ proyecto: s.PROYECTO, torre: s.TORRE, actividad: actId, nivel: n, unidad: u, estado: est });
+  }
+  if (SEL.size) {
+    const est = $("#estado").value;
+    if (!est) { alert("Elige el estado para las unidades seleccionadas."); return; }
+    const s = sampleDe(a); if (!s) { alert("Actividad no habilitada."); return; }
+    for (const k of SEL) {
+      const [n, u] = k.split("|");
+      items.push({ proyecto: s.PROYECTO, torre: s.TORRE, actividad: a, nivel: n, unidad: u, estado: est });
+    }
+  }
   const btn = $("#save"); btn.disabled = true; btn.textContent = "...";
   const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"registro-save", items }) });
   btn.disabled = false; btn.textContent = "Guardar";
   if (d.success) {
-    alert(d.offline ? "Guardado offline. Se sincronizará al haber señal." : "Registrado correctamente (" + d.registrados + ").");
-    SEL.clear();
+    alert(d.offline ? "Guardado offline (" + items.length + "). Se sincronizará al haber señal." : "Registrado correctamente (" + d.registrados + ").");
+    PEND.clear(); SEL.clear();
     D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) }); rebuildLast(); render();
   }
 }
