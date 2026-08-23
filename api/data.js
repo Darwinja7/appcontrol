@@ -90,9 +90,10 @@ export default async function handler(req, res) {
     const a = (req.body || {}).action || (req.query || {}).action || "catalogos";
 
     if (a === "catalogos") {
-      const [proyectos, capitulos, actividades, unidades, contratistas, configuracion, registro] = await Promise.all([
+      const [proyectos, capitulos, actividades, niveles, unidades, contratistas, configuracion, registro] = await Promise.all([
         readRows("PROYECTOS"), readRows("CAPITULOS"), readRows("ACTIVIDADES"),
-        readRows("UNIDADES"), readRows("CONTRATISTAS"), readRows("CONFIGURACION"), readRows("REGISTRO")
+        readRows("NIVELES"), readRows("UNIDADES"), readRows("CONTRATISTAS"),
+        readRows("CONFIGURACION"), readRows("REGISTRO")
       ]);
 
       // Aislamiento por tenant: cada usuario solo ve su empresa, su proyecto
@@ -102,12 +103,25 @@ export default async function handler(req, res) {
       const torre = String(u.TORRE || "*");
       const enTorre = (r) => torre === "*" || String(r.TORRE || "") === torre;
 
+      // Relacion actividad<->proyecto: ACTIVIDADES no tiene columna PROYECTO,
+      // se resuelve via su capitulo. Solo actividades activas cuyo capitulo
+      // pertenece al proyecto actual.
+      const capsProy = new Set(
+        capitulos
+          .filter((x) => String(x.PROYECTO || "") === proy && String(x.ACTIVO || "").toUpperCase() === "SI")
+          .map((x) => String(x.CODIGO || ""))
+      );
+      const actsProy = actividades.filter(
+        (x) => String(x.ACTIVO || "").toUpperCase() === "SI" && capsProy.has(String(x.CAPITULO || ""))
+      );
+
       return res.json({
         proyectos: proyectos.filter((p) => String(p.EMPRESA || "") === emp && String(p.CODIGO || "") === proy),
         capitulos: capitulos.filter((x) => String(x.PROYECTO || "") === proy),
-        actividades,
+        actividades: actsProy,
+        niveles: niveles.filter((x) => String(x.PROYECTO || "") === proy && enTorre(x)),
         unidades: unidades.filter((x) => String(x.PROYECTO || "") === proy && enTorre(x)),
-        contratistas,
+        contratistas: contratistas.filter((ct) => String(ct.ACTIVO || "").toUpperCase() === "SI"),
         configuracion: configuracion.filter((r) => String(r.PROYECTO || "") === proy && enTorre(r)),
         registro: registro.filter((r) => String(r.PROYECTO || "") === proy && enTorre(r)).slice(-MAX_REGISTRO),
         me: { rol: u.ROL, proyecto: u.PROYECTO, torre: u.TORRE, nombre: u.NOMBRE, empresa: u.EMPRESA }

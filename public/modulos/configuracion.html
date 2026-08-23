@@ -76,7 +76,13 @@ async function init() {
     render();
   };
 }
-function torres() { return [...new Set(D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value).map((u) => u.TORRE))]; }
+function torres() {
+  const p = $("#proyecto").value;
+  return [...new Set([
+    ...D.unidades.filter((u) => u.PROYECTO === p).map((u) => u.TORRE),
+    ...((D.niveles || []).filter((n) => n.PROYECTO === p).map((n) => n.TORRE))
+  ])];
+}
 function reset() { sel.clear(); $("#actividad").innerHTML = ""; $("#box").innerHTML = ""; }
 function getRow(t, a, n, u) {
   let r = findRow(t, a, n, u);
