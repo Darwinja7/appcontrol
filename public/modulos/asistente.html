@@ -117,7 +117,7 @@ async function enviar() {
   const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"wizard-chat", mensajes: MENSAJES }) });
   $(".msgs").lastChild.remove();
   if (!d.success) {
-    const texto = d.codigo === "SIN_LLM" ? "Aún no tienes IA configurada. Elige tu proveedor, pega tu llave API y guárdala — tú pagas solo tu consumo." : "Error del proveedor: " + (d.detalle || d.codigo);
+    const texto = d.codigo === "SIN_LLM" ? "Configura primero el LLM para tu agente IA: elige el proveedor, pega tu llave API y guárdala." : "Error del proveedor: " + (d.detalle || d.codigo);
     agregarBurb(texto, "bot"); return;
   }
   MENSAJES.push({ role:"assistant", content:d.mensaje });

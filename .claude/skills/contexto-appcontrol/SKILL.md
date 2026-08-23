@@ -138,7 +138,7 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
 - Actividades por NIVEL (APLICACION en ACTIVIDADES): backend expande registro de nivel a unidades activas; calcularAvance/dashboard promedian el nivel. ACT004 demo en T2 niv 1-3.
 - Usuarios: empresa/proyecto/torre validados; torres-list; DEVELOPER_ADMINS (ya en Vercel) = admin desarrollador; empresas-save/proyectos-save.
 - Maestro XLSX export/import con diff previo (v1.8.0).
-- Asistente IA (v1.9.0): modulo asistente.html; llaves cifradas AES-GCM (HKDF SESSION_SECRET) en LLM_CONFIG; respaldo OPENROUTER_API_KEY server con modelo openrouter/stealth/ox-alpha reasoning low; wizard-chat JSON estricto con sinonimos; voz Web Speech es-CO; estructura-save guiado idempotente. Pestaña LLM_CONFIG se crea sola al primer guardado.
+- Asistente IA (v1.9.0): modulo asistente.html; llaves cifradas AES-GCM (HKDF SESSION_SECRET) en LLM_CONFIG; politica BYOK v1.9.1: SIN llaves de servidor; cada admin paga su consumo con su propia llave cifrada; wizard-chat JSON estricto con sinonimos; voz Web Speech es-CO; estructura-save guiado idempotente. Pestaña LLM_CONFIG se crea sola al primer guardado.
 - Demo P000/T2: 23 niveles, 127 unidades (lobby, pk pisos 2-3, aptos 401-2106, amenidades).
 - Scripts test: check-inline, relaciones, registro, usuarios-tenant, por-nivel, expansion-nivel, maestro, llm.
 - Pendiente E2E con sesion del usuario: matriz completa (crear usuario combos, wizard con llave real, maestro roundtrip, voz en Chrome Android).
