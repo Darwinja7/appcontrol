@@ -4,9 +4,9 @@ export const PROVEEDORES = {
   openrouter: {
     nombre: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
-    modeloDefault: "openrouter/stealth/ox-alpha",
+    modeloDefault: "stealth/ox-alpha",
     razonamientoBajo: true,
-    envFallback: "OPENROUTER_API_KEY"
+    envFallback: ""
   },
   huggingface: {
     nombre: "Hugging Face Router",
