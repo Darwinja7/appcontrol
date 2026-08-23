@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Ingresar · AppControl</title>
+<title>Ingresar Ã‚Â· AppControl</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
 <meta name="theme-color" content="#0B0F14"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
@@ -43,18 +43,18 @@ input:focus,select:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0
         <svg width="32" height="32" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB020"/><path d="M9.5 22v-6M16 22V9.5M22.5 22v-9" stroke="#0B0F14" stroke-width="3.4" stroke-linecap="round"/></svg>
         App<em>Control</em>
       </div>
-      <h2>Ingresa, registra y deja la obra al día.</h2>
+      <h2>Ingresa, registra y deja la obra al dÃƒÂ­a.</h2>
       <p>Selecciona empresa y proyecto. Cada usuario entra con su correo, permisos y trazabilidad.</p>
     </div>
     <div class="live">
-      <p><b>Demo:</b> Urbanizadora Jiménez · Salguero Elite 2</p>
+      <p><b>Demo:</b> Urbanizadora JimÃƒÂ©nez Ã‚Â· Salguero Elite 2</p>
       <p>ADMIN inicial: director@urbanizadorajimenez.com</p>
     </div>
   </section>
 
   <section class="form-side">
     <div id="loginPanel" class="panel on">
-      <h1>Iniciar sesión</h1>
+      <h1>Iniciar sesiÃƒÂ³n</h1>
       <p class="sub">Control de avance de obra</p>
 
       <label>Empresa</label>
@@ -66,24 +66,24 @@ input:focus,select:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0
       <label>Correo</label>
       <input id="email" type="email" placeholder="director@urbanizadorajimenez.com" autocomplete="username"/>
 
-      <label>Contraseña</label>
-      <input id="password" type="password" placeholder="••••••" autocomplete="current-password"/>
+      <label>ContraseÃƒÂ±a</label>
+      <input id="password" type="password" placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢" autocomplete="current-password"/>
 
       <button class="btn" id="loginBtn">Entrar</button>
 
       <div id="loginMsg" class="msg"></div>
 
       <div class="small">
-        <a id="forgotLink">Olvidé mi contraseña</a> · <a href="/">Volver al inicio</a>
+        <a id="forgotLink">OlvidÃƒÂ© mi contraseÃƒÂ±a</a> Ã‚Â· <a href="/">Volver al inicio</a>
       </div>
     </div>
 
     <div id="changePanel" class="panel">
-      <h1>Crea tu contraseña</h1>
-      <p class="sub">Por seguridad debes cambiar la contraseña inicial.</p>
+      <h1>Crea tu contraseÃƒÂ±a</h1>
+      <p class="sub">Por seguridad debes cambiar la contraseÃƒÂ±a inicial.</p>
 
-      <label>Nueva contraseña</label>
-      <input id="newPassword" type="password" placeholder="Mínimo 6 caracteres"/>
+      <label>Nueva contraseÃƒÂ±a</label>
+      <input id="newPassword" type="password" placeholder="MÃƒÂ­nimo 6 caracteres"/>
 
       <button class="btn" id="changeBtn">Guardar y entrar</button>
       <div id="changeMsg" class="msg"></div>
@@ -107,10 +107,10 @@ input:focus,select:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0
       <label>PIN recibido</label>
       <input id="pin" placeholder="123456"/>
 
-      <label>Nueva contraseña</label>
-      <input id="resetPassword" type="password" placeholder="Mínimo 6 caracteres"/>
+      <label>Nueva contraseÃƒÂ±a</label>
+      <input id="resetPassword" type="password" placeholder="MÃƒÂ­nimo 6 caracteres"/>
 
-      <button class="btn" id="resetBtn">Cambiar contraseña</button>
+      <button class="btn" id="resetBtn">Cambiar contraseÃƒÂ±a</button>
       <button class="btn secondary" id="backLoginBtn">Volver al login</button>
 
       <div id="forgotMsg" class="msg"></div>
@@ -139,20 +139,13 @@ function fill(sel, rows, map) {
 }
 
 async function loadOptions() {
-  const r = await fetch("/api/options");
+  const r = await fetch("/api/auth", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action:"options" }) });
   OPTIONS = await r.json();
-
   fill($("#empresa"), OPTIONS.empresas, e => ({ v:e.CODIGO, t:e.NOMBRE }));
   fill($("#fEmpresa"), OPTIONS.empresas, e => ({ v:e.CODIGO, t:e.NOMBRE }));
-
-  function refreshProjects(srcEmp, targetProject) {
-    const emp = srcEmp.value;
-    fill(targetProject, OPTIONS.proyectos.filter(p => p.EMPRESA === emp), p => ({ v:p.CODIGO, t:p.NOMBRE + (p.DEMO === "SI" ? " · DEMO" : "") }));
-  }
-
+  function refreshProjects(srcEmp, targetProject) { const emp = srcEmp.value; fill(targetProject, OPTIONS.proyectos.filter(p => p.EMPRESA === emp), p => ({ v:p.CODIGO, t:p.NOMBRE + (p.DEMO === "SI" ? " · DEMO" : "") })); }
   $("#empresa").onchange = () => refreshProjects($("#empresa"), $("#proyecto"));
   $("#fEmpresa").onchange = () => refreshProjects($("#fEmpresa"), $("#fProyecto"));
-
   refreshProjects($("#empresa"), $("#proyecto"));
   refreshProjects($("#fEmpresa"), $("#fProyecto"));
 }
@@ -168,11 +161,7 @@ $("#loginBtn").onclick = async () => {
     password: $("#password").value
   };
 
-  const r = await fetch("/api/login", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify(body)
-  });
+  const r = await fetch("/api/auth", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action:"login", ...body }) });
 
   const d = await r.json();
 
@@ -190,29 +179,21 @@ $("#loginBtn").onclick = async () => {
     return;
   }
 
-  msg($("#loginMsg"), "No fue posible ingresar. Verifica empresa, proyecto, correo y contraseña.");
+  msg($("#loginMsg"), "No fue posible ingresar. Verifica empresa, proyecto, correo y contraseÃƒÂ±a.");
 };
 
 $("#changeBtn").onclick = async () => {
   if (!pendingChange) return show("loginPanel");
 
   const newPassword = $("#newPassword").value;
-  if (newPassword.length < 6) return msg($("#changeMsg"), "La contraseña debe tener mínimo 6 caracteres.");
+  if (newPassword.length < 6) return msg($("#changeMsg"), "La contraseÃƒÂ±a debe tener mÃƒÂ­nimo 6 caracteres.");
 
-  const r = await fetch("/api/change-password", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      ...pendingChange,
-      currentPassword: pendingChange.password,
-      newPassword
-    })
-  });
+  const r = await fetch("/api/auth", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action:"change-password", ...pendingChange, currentPassword: pendingChange.password, newPassword }) });
 
   const d = await r.json();
 
   if (d.success) location.href = "/app.html";
-  else msg($("#changeMsg"), "No fue posible cambiar la contraseña.");
+  else msg($("#changeMsg"), "No fue posible cambiar la contraseÃƒÂ±a.");
 };
 
 $("#forgotLink").onclick = () => show("forgotPanel");
@@ -232,7 +213,7 @@ $("#sendPinBtn").onclick = async () => {
   const d = await r.json();
 
   if (d.success) {
-    msg($("#forgotMsg"), d.devPin ? "PIN enviado. DEV PIN: " + d.devPin : "Si el correo existe, recibirás un PIN por 2 minutos.", "ok");
+    msg($("#forgotMsg"), d.devPin ? "PIN enviado. DEV PIN: " + d.devPin : "Si el correo existe, recibirÃƒÂ¡s un PIN por 2 minutos.", "ok");
   } else {
     msg($("#forgotMsg"), "No fue posible enviar el PIN.");
   }
@@ -254,10 +235,10 @@ $("#resetBtn").onclick = async () => {
   const d = await r.json();
 
   if (d.success) {
-    msg($("#forgotMsg"), "Contraseña actualizada. Ya puedes iniciar sesión.", "ok");
+    msg($("#forgotMsg"), "ContraseÃƒÂ±a actualizada. Ya puedes iniciar sesiÃƒÂ³n.", "ok");
     setTimeout(() => show("loginPanel"), 1200);
   } else {
-    msg($("#forgotMsg"), d.codigo === "PIN_EXPIRADO" ? "PIN expirado. Solicita uno nuevo." : "PIN inválido o datos incorrectos.");
+    msg($("#forgotMsg"), d.codigo === "PIN_EXPIRADO" ? "PIN expirado. Solicita uno nuevo." : "PIN invÃƒÂ¡lido o datos incorrectos.");
   }
 };
 

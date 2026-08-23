@@ -15,9 +15,9 @@ body::before{display:none}
 </head>
 <body>
 <div class="card" style="margin-top:0">
-  <div class="kicker">Administración</div>
+  <div class="kicker">AdministraciÃ³n</div>
   <h2 style="margin:6px 0 4px;font-size:22px">Usuarios y permisos</h2>
-  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores. Todos entran inicialmente con contraseña 123456 y deben cambiarla.</p>
+  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores. Todos entran inicialmente con contraseÃ±a 123456 y deben cambiarla.</p>
 
   <div class="tools">
     <div><label>Nombre</label><input id="nombre" placeholder="Nombre completo"/></div>
@@ -34,7 +34,7 @@ body::before{display:none}
 <script src="/js/app.js"></script>
 <script>
 async function cargar() {
-  const d = await api("/api/users");
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-list" }) });
   if (!d.success) {
     document.querySelector(".card").innerHTML = "<p class='msg err'>Solo ADMIN puede administrar usuarios.</p>";
     return;
@@ -68,17 +68,14 @@ $("#crear").onclick = async () => {
     torre: $("#torre").value.trim() || "*"
   };
 
-  const d = await api("/api/users", {
-    method: "POST",
-    body: JSON.stringify(body)
-  });
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-create", ...body }) });
 
   if (d.success) {
     $("#m").className = "msg ok";
     $("#m").innerHTML = `Usuario creado.<br>
       Correo: <b>${d.usuario.email}</b><br>
-      Contraseña inicial: <b>${d.usuario.passwordInicial}</b><br>
-      Código de acceso generado: <b>${d.usuario.accessCode}</b><br>
+      ContraseÃ±a inicial: <b>${d.usuario.passwordInicial}</b><br>
+      CÃ³digo de acceso generado: <b>${d.usuario.accessCode}</b><br>
       En la hoja solo queda guardado en hash.`;
     $("#nombre").value = "";
     $("#email").value = "";
@@ -97,12 +94,8 @@ window.toggle = async (email, activo) => {
   cargar();
 };
 
-window.resetPass = async (email) => {
-  await api("/api/users", {
-    method: "PATCH",
-    body: JSON.stringify({ email, resetPassword: true })
-  });
-  alert("Contraseña reiniciada a 123456. El usuario deberá cambiarla al entrar.");
+window.resetPass = async (email) => { await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, resetPassword: true }) }));
+  alert("ContraseÃ±a reiniciada a 123456. El usuario deberÃ¡ cambiarla al entrar.");
   cargar();
 };
 

@@ -39,7 +39,7 @@ label.cell input{width:auto;accent-color:var(--amber)}
 <script>
 let D = null, LAST = new Map(), SEL = new Set();
 async function init() {
-  D = await api("/api/data");
+  D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) });
   rebuildLast();
   const acts = [...new Set(cfgHab().map((r) => r.ACTIVIDAD))];
   fill($("#actividad"), acts.map((a) => ({ CODIGO: a })), (x) => ({ v: x.CODIGO, t: x.CODIGO }));
@@ -82,12 +82,12 @@ async function guardar() {
   const sample = cfgHab().find((r) => r.ACTIVIDAD === a);
   const items = [...SEL].map((k) => { const [n, u] = k.split("|"); return { proyecto: sample.PROYECTO, torre: sample.TORRE, actividad: a, nivel: n, unidad: u, estado: est }; });
   const btn = $("#save"); btn.disabled = true; btn.textContent = "...";
-  const d = await api("/api/registro-save", { method: "POST", body: JSON.stringify({ items }) });
+  const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"registro-save", items }) });
   btn.disabled = false; btn.textContent = "Guardar";
   if (d.success) {
-    alert(d.offline ? "Guardado offline. Se sincronizarÃ¡ al haber seÃ±al." : "Registrado correctamente (" + d.registrados + ").");
+    alert(d.offline ? "Guardado offline. Se sincronizarÃƒÂ¡ al haber seÃƒÂ±al." : "Registrado correctamente (" + d.registrados + ").");
     SEL.clear();
-    D = await api("/api/data"); rebuildLast(); render();
+    D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) }); rebuildLast(); render();
   }
 }
 init();
