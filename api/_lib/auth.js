@@ -1,9 +1,19 @@
 import crypto from "crypto";
 import { readRows } from "./sheets.js";
 
-// Secreto de sesión: usa la variable de Vercel; si falta, fallback de desarrollo
-// (en producción SIEMPRE define SESSION_SECRET).
-const SECRET = process.env.SESSION_SECRET || "appcontrol-dev-secret-temporal";
+// Secreto de sesión: obligatorio en producción (fail-closed).
+// Si falta SESSION_SECRET en producción, la app se niega a firmar tokens
+// en lugar de usar un secreto conocido públicamente en el repo.
+const SECRET = (() => {
+  const isProd = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+  const s = process.env.SESSION_SECRET;
+  if (!s) {
+    if (isProd) throw new Error("SESSION_SECRET no definida: configúrala en Vercel antes de desplegar.");
+    return "appcontrol-dev-secret-temporal";
+  }
+  if (isProd && s.length < 32) throw new Error("SESSION_SECRET demasiado corta: usa 32+ caracteres aleatorios.");
+  return s;
+})();
 
 export const sha256Hex = (i) =>
   crypto.createHash("sha256").update(String(i)).digest("hex");
@@ -72,5 +82,12 @@ export function parseCookies(h) {
 }
 
 export function resetPin() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // Criptográficamente aleatorio (Math.random es predecible).
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+// Contraseña temporal de 8 caracteres para usuarios creados o reseteados.
+// Se muestra UNA vez al administrador y obliga a cambio en el primer login.
+export function passwordTemporal() {
+  return crypto.randomBytes(6).toString("base64url");
 }

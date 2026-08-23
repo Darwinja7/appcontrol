@@ -1,6 +1,7 @@
 export async function sendResetPin({ to, pin, nombre }) {
   if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM) {
-    console.warn("MAIL_NOT_CONFIGURED PIN:", pin, "TO:", to);
+    // Nunca registrar el PIN en logs: solo el hecho de que no se envió.
+    console.warn("MAIL_NOT_CONFIGURED: PIN no enviado (revisa RESEND_API_KEY y MAIL_FROM). Destino:", to);
     return { sent: false, reason: "MAIL_NOT_CONFIGURED" };
   }
 
