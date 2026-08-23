@@ -15,9 +15,9 @@ body::before{display:none}
 </head>
 <body>
 <div class="card" style="margin-top:0">
-  <div class="kicker">AdministraciÃ³n</div>
+  <div class="kicker">Administración</div>
   <h2 style="margin:6px 0 4px;font-size:22px">Usuarios y permisos</h2>
-  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores. Todos entran inicialmente con contraseÃ±a 123456 y deben cambiarla.</p>
+  <p style="color:var(--mut);font-size:13px">Crea residentes y visualizadores. Cada usuario recibe una contraseña temporal y debe cambiarla al entrar.</p>
 
   <div class="tools">
     <div><label>Nombre</label><input id="nombre" placeholder="Nombre completo"/></div>
@@ -44,20 +44,25 @@ async function cargar() {
 
   for (const u of d.usuarios) {
     html += `<tr>
-      <td>${u.NOMBRE}</td>
-      <td>${u.EMAIL}</td>
-      <td>${u.ROL}</td>
-      <td>${u.TORRE}</td>
+      <td>${esc(u.NOMBRE)}</td>
+      <td>${esc(u.EMAIL)}</td>
+      <td>${esc(u.ROL)}</td>
+      <td>${esc(u.TORRE)}</td>
       <td><span class='badge ${u.ACTIVO === "SI" ? "on" : "off"}'>${u.ACTIVO === "SI" ? "ACTIVO" : "INACTIVO"}</span></td>
       <td>
-        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' onclick='toggle("${u.EMAIL}","${u.ACTIVO === "SI" ? "NO" : "SI"}")'>${u.ACTIVO === "SI" ? "Desactivar" : "Activar"}</button>
-        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' onclick='resetPass("${u.EMAIL}")'>Reset 123456</button>
+        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' data-act='toggle' data-email='${esc(u.EMAIL)}' data-activo='${u.ACTIVO === "SI" ? "NO" : "SI"}'>${u.ACTIVO === "SI" ? "Desactivar" : "Activar"}</button>
+        <button class='btn secondary' style='width:auto;padding:8px 10px;margin:0' data-act='reset' data-email='${esc(u.EMAIL)}'>Resetear contraseña</button>
       </td>
     </tr>`;
   }
 
   html += "</table>";
   $("#tabla").innerHTML = html;
+
+  $("#tabla").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+    if (b.dataset.act === "toggle") toggle(b.dataset.email, b.dataset.activo);
+    else resetPass(b.dataset.email);
+  });
 }
 
 $("#crear").onclick = async () => {
@@ -73,9 +78,9 @@ $("#crear").onclick = async () => {
   if (d.success) {
     $("#m").className = "msg ok";
     $("#m").innerHTML = `Usuario creado.<br>
-      Correo: <b>${d.usuario.email}</b><br>
-      ContraseÃ±a inicial: <b>${d.usuario.passwordInicial}</b><br>
-      CÃ³digo de acceso generado: <b>${d.usuario.accessCode}</b><br>
+      Correo: <b>${esc(d.usuario.email)}</b><br>
+      Contraseña temporal: <b>${esc(d.usuario.passwordInicial)}</b> (cópiala ahora, no se vuelve a mostrar)<br>
+      Código de acceso generado: <b>${esc(d.usuario.accessCode)}</b><br>
       En la hoja solo queda guardado en hash.`;
     $("#nombre").value = "";
     $("#email").value = "";
@@ -86,18 +91,18 @@ $("#crear").onclick = async () => {
   }
 };
 
-window.toggle = async (email, activo) => {
-  await api("/api/users", {
-    method: "PATCH",
-    body: JSON.stringify({ email, activo })
-  });
+async function toggle(email, activo) {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, activo }) });
+  if (!d.success) alert("No fue posible cambiar el estado. " + (d.codigo || ""));
   cargar();
-};
+}
 
-window.resetPass = async (email) => { await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, resetPassword: true }) }));
-  alert("ContraseÃ±a reiniciada a 123456. El usuario deberÃ¡ cambiarla al entrar.");
+async function resetPass(email) {
+  const d = await api("/api/auth", { method:"POST", body: JSON.stringify({ action:"users-patch", email, resetPassword: true }) });
+  if (d.success && d.passwordTemporal) alert("Contraseña reiniciada a: " + d.passwordTemporal + ". El usuario deberá cambiarla al entrar.");
+  else alert(d.success ? "Contraseña reiniciada." : "No fue posible reiniciar la contraseña.");
   cargar();
-};
+}
 
 cargar();
 </script>

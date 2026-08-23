@@ -55,7 +55,7 @@ function render() {
   const cells = cfgHab().filter((r) => r.ACTIVIDAD === a);
   const niveles = [...new Set(cells.map((r) => r.NIVEL))].sort((x, y) => +x - +y);
   const cols = [...new Set(cells.map((r) => r.UNIDAD))].sort();
-  let html = "<table class='grid'><tr><th>NIVEL</th><th>AV.</th>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
+  let html = "<table class='grid'><tr><th>NIVEL</th><th>AV.</th>" + cols.map((c) => `<th>${esc(c)}</th>`).join("") + "</tr>";
   for (const n of niveles) {
     const vals = []; let tds = "";
     for (const u of cols) {
@@ -65,10 +65,10 @@ function render() {
       const st = last ? last.ESTADO : "Sin empezar";
       vals.push(VALOR[st] ?? 0);
       const k = n + "|" + u;
-      tds += `<td><label class='cell'><input type='checkbox' ${SEL.has(k) ? "checked" : ""} data-k='${k}'/><span class='chip st${ESTADOS.indexOf(st)}'>${st.substring(0, 3)}</span></label></td>`;
+      tds += `<td><label class='cell'><input type='checkbox' ${SEL.has(k) ? "checked" : ""} data-k='${esc(k)}'/><span class='chip st${ESTADOS.indexOf(st)}'>${esc(st.substring(0, 3))}</span></label></td>`;
     }
     const avg = vals.length ? Math.round((vals.reduce((x, y) => x + y, 0) / vals.length) * 100) : 0;
-    html += `<tr><td class='lvl'>${n}</td><td class='av'>${avg}%</td>` + tds + "</tr>";
+    html += `<tr><td class='lvl'>${esc(n)}</td><td class='av'>${avg}%</td>` + tds + "</tr>";
   }
   html += "</table>";
   $("#box").innerHTML = html;
@@ -85,7 +85,7 @@ async function guardar() {
   const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"registro-save", items }) });
   btn.disabled = false; btn.textContent = "Guardar";
   if (d.success) {
-    alert(d.offline ? "Guardado offline. Se sincronizarÃƒÂ¡ al haber seÃƒÂ±al." : "Registrado correctamente (" + d.registrados + ").");
+    alert(d.offline ? "Guardado offline. Se sincronizará al haber señal." : "Registrado correctamente (" + d.registrados + ").");
     SEL.clear();
     D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) }); rebuildLast(); render();
   }

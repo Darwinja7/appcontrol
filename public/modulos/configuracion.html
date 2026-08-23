@@ -6,7 +6,7 @@
 <link rel="manifest" href="/manifest.webmanifest"/>
 <meta name="theme-color" content="#0B0F14"/>
 <meta name="mobile-web-app-capable" content="yes"/>
-<title>ConfiguraciÃƒÂ³n</title>
+<title>Configuración</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/main.css"/>
 <style>
@@ -25,8 +25,8 @@ body::before{display:none}
 <body>
 <div class="card" style="margin-top:0">
   <div class="kicker">Capa de control</div>
-  <h2 style="margin:6px 0 4px;font-size:22px">Base depurada: quÃƒÂ© se puede ejecutar</h2>
-  <p style="color:var(--mut);font-size:13px">HABILITADO = APLICA SÃƒÂ­ + ACTIVO SÃƒÂ­ + CONTRATISTA asignado. Solo lo habilitado aparece en el Grid.</p>
+  <h2 style="margin:6px 0 4px;font-size:22px">Base depurada: qué se puede ejecutar</h2>
+  <p style="color:var(--mut);font-size:13px">HABILITADO = APLICA Sí + ACTIVO Sí + CONTRATISTA asignado. Solo lo habilitado aparece en el Grid.</p>
   <label>Proyecto</label><select id="proyecto"></select>
   <label>Torre</label><select id="torre"></select>
   <label>Actividad</label><select id="actividad"></select>
@@ -34,12 +34,12 @@ body::before{display:none}
     <span><i style="background:#2A3138"></i>No aplica / sin configurar</span>
     <span><i style="background:#6E5620"></i>Aplica, no habilitado</span>
     <span><i style="background:#245C43"></i>Habilitado</span>
-    <span>Ã‚Â· clic = seleccionar varias celdas</span>
+    <span>· clic = seleccionar varias celdas</span>
   </div>
   <div class="actions">
-    <button class="btn secondary" id="aSi">Aplica = SÃƒÂ­</button>
+    <button class="btn secondary" id="aSi">Aplica = Sí</button>
     <button class="btn secondary" id="aNo">Aplica = No</button>
-    <button class="btn secondary" id="vSi">Activo = SÃƒÂ­</button>
+    <button class="btn secondary" id="vSi">Activo = Sí</button>
     <button class="btn secondary" id="vNo">Activo = No</button>
     <select id="contratista"></select>
     <button class="btn secondary" id="aCt">Asignar contratista</button>
@@ -71,7 +71,7 @@ async function init() {
   $("#aCt").onclick = () => bulk((r) => { r.CONTRATISTA = $("#contratista").value || "Sin asignar"; });
   $("#save").onclick = async () => {
     const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"config-save", rows: CFG }) });
-    $("#m").textContent = d.success ? "ConfiguraciÃƒÂ³n guardada (" + d.guardadas + " filas). HABILITADO recalculado." : "Error al guardar";
+    $("#m").textContent = d.success ? "Configuración guardada (" + d.guardadas + " filas). HABILITADO recalculado." : "Error al guardar";
     $("#m").className = "msg " + (d.success ? "ok" : "err");
     render();
   };
@@ -90,17 +90,17 @@ function render() {
   const units = D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value && u.TORRE === t && u.ACTIVO === "SI");
   const niveles = [...new Set(units.map((u) => u.NIVEL))].sort((x, y) => +x - +y);
   const cols = [...new Set(units.map((u) => u.UNIDAD))].sort();
-  let html = "<table class='grid'><tr><th>NIVEL</th>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
+  let html = "<table class='grid'><tr><th>NIVEL</th>" + cols.map((c) => `<th>${esc(c)}</th>`).join("") + "</tr>";
   for (const n of niveles) {
-    html += `<tr><td class='lvl'>${n}</td>`;
+    html += `<tr><td class='lvl'>${esc(n)}</td>`;
     for (const u of cols) {
       const exists = units.some((x) => x.UNIDAD === u && x.NIVEL === n);
       if (!exists) { html += "<td></td>"; continue; }
       const r = findRow(t, a, n, u);
       const cls = !r || r.APLICA !== "SI" ? "c0" : hab(r) ? "c2" : "c1";
-      const txt = !r || r.APLICA !== "SI" ? "Ã‚Â·" : hab(r) ? "HAB" : "APL";
+      const txt = !r || r.APLICA !== "SI" ? "·" : hab(r) ? "HAB" : "APL";
       const k = key(t, a, n, u);
-      html += `<td><button class='cellbtn ${cls} ${sel.has(k) ? "selring" : ""}' data-k='${k}'>${txt}</button></td>`;
+      html += `<td><button class='cellbtn ${cls} ${sel.has(k) ? "selring" : ""}' data-k='${esc(k)}'>${txt}</button></td>`;
     }
     html += "</tr>";
   }

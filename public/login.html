@@ -128,7 +128,8 @@ let OPTIONS = null, pendingChange = null, pinTimer = null;
 const $ = (s) => document.querySelector(s);
 function msg(el, text, type = "err") { el.textContent = text; el.className = "msg " + type; }
 function show(name) { ["loginPanel","changePanel","forgotPanel"].forEach(id => $("#" + id).classList.remove("on")); $("#" + name).classList.add("on"); }
-function fill(sel, rows, map) { sel.innerHTML = rows.map(r => `<option value="${map(r).v}">${map(r).t}</option>`).join(""); }
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function fill(sel, rows, map) { sel.innerHTML = rows.map(r => `<option value="${esc(map(r).v)}">${esc(map(r).t)}</option>`).join(""); }
 
 function updateMode() {
   const p = (OPTIONS.proyectos || []).find(x => x.CODIGO === $("#proyecto").value);
@@ -209,7 +210,8 @@ $("#sendPinBtn").onclick = async () => {
   $("#sendPinBtn").textContent = "Enviar PIN";
   if (d.success) {
     if (d.sent) msg($("#pinStatus"), "PIN enviado. Revisa tu correo.", "ok");
-    else msg($("#pinStatus"), "PIN enviado. Correo no configurado en este entorno; tu PIN es: " + d.devPin, "ok");
+    else if (d.devPin) msg($("#pinStatus"), "Entorno de desarrollo: tu PIN es: " + d.devPin, "ok");
+    else msg($("#pinStatus"), "PIN emitido. El envío por correo falló; contacta al administrador de la plataforma.", "err");
     startCountdown(120);
   } else msg($("#pinStatus"), "No fue posible emitir el PIN.");
 };
