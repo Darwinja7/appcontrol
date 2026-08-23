@@ -83,6 +83,15 @@ function torres() {
     ...((D.niveles || []).filter((n) => n.PROYECTO === p).map((n) => n.TORRE))
   ])];
 }
+const actInfo = (a) => D.actividades.find((x) => x.CODIGO === a);
+const esPorNivel = (a) => (String(actInfo(a)?.APLICACION || "").toUpperCase() === "NIVEL");
+function nivelesDeTorre(t) {
+  const p = $("#proyecto").value;
+  return [...new Set([
+    ...(D.niveles || []).filter((n) => n.PROYECTO === p && n.TORRE === t).map((n) => String(n.NIVEL)),
+    ...D.unidades.filter((u) => u.PROYECTO === p && u.TORRE === t).map((u) => String(u.NIVEL))
+  ])].sort((x, y) => +x - +y);
+}
 function reset() { sel.clear(); $("#actividad").innerHTML = ""; $("#box").innerHTML = ""; }
 function getRow(t, a, n, u) {
   let r = findRow(t, a, n, u);
@@ -93,6 +102,7 @@ function bulk(fn) { sel.forEach((k) => { const [t, a, n, u] = k.split("|"); fn(g
 function render() {
   const t = $("#torre").value, a = $("#actividad").value;
   if (!t || !a) return;
+  if (esPorNivel(a)) return renderPorNivel(t, a);
   const units = D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value && u.TORRE === t && u.ACTIVO === "SI");
   const niveles = [...new Set(units.map((u) => u.NIVEL))].sort((x, y) => +x - +y);
   const cols = [...new Set(units.map((u) => u.UNIDAD))].sort();
@@ -102,16 +112,35 @@ function render() {
     for (const u of cols) {
       const exists = units.some((x) => x.UNIDAD === u && x.NIVEL === n);
       if (!exists) { html += "<td></td>"; continue; }
-      const r = findRow(t, a, n, u);
-      const cls = !r || r.APLICA !== "SI" ? "c0" : hab(r) ? "c2" : "c1";
-      const txt = !r || r.APLICA !== "SI" ? "·" : hab(r) ? "HAB" : "APL";
-      const k = key(t, a, n, u);
-      html += `<td><button class='cellbtn ${cls} ${sel.has(k) ? "selring" : ""}' data-k='${esc(k)}'>${txt}</button></td>`;
+      html += celdaConfig(t, a, n, u);
     }
     html += "</tr>";
   }
   html += "</table>";
   $("#box").innerHTML = html;
+  wireCeldas();
+}
+
+function renderPorNivel(t, a) {
+  const niveles = nivelesDeTorre(t);
+  let html = "<table class='grid'><tr><th>NIVEL</th><th>Estado</th></tr>";
+  for (const n of niveles) {
+    html += `<tr><td class='lvl'>${esc(n)}</td>` + celdaConfig(t, a, n, "NIVEL") + "</tr>";
+  }
+  html += "</table>";
+  $("#box").innerHTML = html;
+  wireCeldas();
+}
+
+function celdaConfig(t, a, n, u) {
+  const r = findRow(t, a, n, u);
+  const cls = !r || r.APLICA !== "SI" ? "c0" : hab(r) ? "c2" : "c1";
+  const txt = !r || r.APLICA !== "SI" ? "·" : hab(r) ? "HAB" : "APL";
+  const k = key(t, a, n, u);
+  return `<td><button class='cellbtn ${cls} ${sel.has(k) ? "selring" : ""}' data-k='${esc(k)}'>${txt}</button></td>`;
+}
+
+function wireCeldas() {
   $("#box").querySelectorAll(".cellbtn").forEach((b) => b.onclick = () => { const k = b.dataset.k; sel.has(k) ? sel.delete(k) : sel.add(k); render(); });
 }
 init();

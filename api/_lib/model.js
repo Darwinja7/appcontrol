@@ -23,7 +23,7 @@ export const HEADERS = {
 
   CAPITULOS: ["CODIGO","NOMBRE","PROYECTO","PONDERACION","ACTIVO"],
 
-  ACTIVIDADES: ["CODIGO","NOMBRE","CAPITULO","PONDERACION","ACTIVO"],
+  ACTIVIDADES: ["CODIGO","NOMBRE","CAPITULO","PONDERACION","ACTIVO","APLICACION"],
 
   NIVELES: ["PROYECTO","TORRE","NIVEL","ESPECIAL"],
 
@@ -81,6 +81,14 @@ export const VALORES = {
 };
 
 export const SIN_CONTRATISTA = "Sin asignar";
+
+// Pseudo-unidad para actividades que se ejecutan por nivel completo
+// (estructura, movimiento de tierras) sin unidad especifica.
+export const UNIDAD_NIVEL = "NIVEL";
+
+// APLICACION de una actividad: "UNIDAD" (por defecto) o "NIVEL".
+export const aplicacionDe = (act) =>
+  String(act?.APLICACION || "").toUpperCase() === "NIVEL" ? "NIVEL" : "UNIDAD";
 
 export function habilitado(row) {
   return String(row.APLICA).toUpperCase() === "SI" &&

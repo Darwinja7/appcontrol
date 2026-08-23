@@ -74,6 +74,7 @@ async function init() {
 }
 function rebuildLast() { LAST = new Map(); for (const r of D.registro) { const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD; if (!LAST.has(k) || r.FECHA > LAST.get(k).FECHA) LAST.set(k, r); } }
 function cfgHab() { return D.configuracion.filter((r) => r.APLICA === "SI" && r.ACTIVO === "SI" && r.CONTRATISTA && r.CONTRATISTA !== "Sin asignar"); }
+const esPorNivel = (a) => (String((D.actividades || []).find((x) => x.CODIGO === a)?.APLICACION || "").toUpperCase() === "NIVEL");
 
 function estadoEfectivo(a, n, u) {
   const k = n + "|" + u;
@@ -85,6 +86,7 @@ function estadoEfectivo(a, n, u) {
 function render() {
   const a = $("#actividad").value; if (!a) return;
   const cells = cfgHab().filter((r) => r.ACTIVIDAD === a);
+  if (esPorNivel(a)) return renderPorNivel(a, cells);
   const niveles = [...new Set(cells.map((r) => r.NIVEL))].sort((x, y) => +x - +y);
   const cols = [...new Set(cells.map((r) => r.UNIDAD))].sort();
   let html = "<table class='grid'><tr><th>NIVEL</th><th>AV.</th>" + cols.map((c) => `<th>${esc(c)}</th>`).join("") + "</tr>";
@@ -93,22 +95,47 @@ function render() {
     for (const u of cols) {
       const c = cells.find((r) => r.NIVEL === n && r.UNIDAD === u);
       if (!c) { tds += "<td></td>"; continue; }
-      const st = estadoEfectivo(a, n, u);
-      vals.push(VALOR[st] ?? 0);
-      const k = n + "|" + u;
-      const pend = PEND.has(a + "|" + k);
-      tds += `<td><label class='cell ${SEL.has(k) ? "sel" : ""} ${pend ? "pend" : ""}' data-k='${esc(k)}' data-st='${esc(st)}'>` +
-        `<span class='chip st${ESTADOS.indexOf(st)}'>${esc(st.substring(0, 3))}</span>` +
-        `<span class='pct'>${Math.round((VALOR[st] ?? 0) * 100)}%</span>` +
-        `</label></td>`;
+      tds += celdaRegistro(a, n, u, vals);
     }
-    const avg = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
-    html += `<tr><td class='lvl'>${esc(n)}</td>` +
-      `<td><div class='avbar'><i style='width:${Math.round(avg * 100)}%;background:${colorAv(avg)}'></i></div>` +
-      `<span style='font-size:11px;color:var(--mut)'>${Math.round(avg * 100)}%</span></td>` + tds + "</tr>";
+    html += filaConAvance(n, vals, tds);
   }
   html += "</table>";
   $("#box").innerHTML = html;
+  wireCeldas();
+}
+
+function renderPorNivel(a, cells) {
+  const niveles = [...new Set(cells.map((r) => r.NIVEL))].sort((x, y) => +x - +y);
+  let html = "<table class='grid'><tr><th>NIVEL</th><th>AV.</th><th>Estado del nivel</th></tr>";
+  for (const n of niveles) {
+    let vals = [];
+    const tds = celdaRegistro(a, n, "NIVEL", vals);
+    html += filaConAvance(n, vals, tds);
+  }
+  html += "</table>";
+  $("#box").innerHTML = html;
+  wireCeldas();
+}
+
+function celdaRegistro(a, n, u, vals) {
+  const st = estadoEfectivo(a, n, u);
+  vals.push(VALOR[st] ?? 0);
+  const k = n + "|" + u;
+  const pend = PEND.has(a + "|" + k);
+  return `<td><label class='cell ${SEL.has(k) ? "sel" : ""} ${pend ? "pend" : ""}' data-k='${esc(k)}' data-st='${esc(st)}'>` +
+    `<span class='chip st${ESTADOS.indexOf(st)}'>${esc(st.substring(0, 3))}</span>` +
+    `<span class='pct'>${Math.round((VALOR[st] ?? 0) * 100)}%</span>` +
+    `</label></td>`;
+}
+
+function filaConAvance(n, vals, tds) {
+  const avg = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
+  return `<tr><td class='lvl'>${esc(n)}</td>` +
+    `<td><div class='avbar'><i style='width:${Math.round(avg * 100)}%;background:${colorAv(avg)}'></i></div>` +
+    `<span style='font-size:11px;color:var(--mut)'>${Math.round(avg * 100)}%</span></td>` + tds + "</tr>";
+}
+
+function wireCeldas() {
 
   $("#box").querySelectorAll("label.cell").forEach((el) => {
     let timer = null, largo = false;
