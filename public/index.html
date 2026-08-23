@@ -52,10 +52,18 @@ h1,h2,.disp{font-family:"Space Grotesk",Inter,sans-serif}a{text-decoration:none;
 .win{height:48px;border-radius:8px;border:1px solid #1D3552;background:#16202B;cursor:pointer;transition:.35s;position:relative}
 .win:hover{transform:scale(1.04)}
 .w0{background:#16202B}.w1{background:#5E3732;border-color:#7E4A44}.w2{background:#6E5620;border-color:#8A6D2B}.w3{background:#31567C;border-color:#3E6E9E}.w4{background:#245C43;border-color:#2E6B52;box-shadow:0 0 14px rgba(46,107,82,.5)}
-.demo-pct-row{display:flex;align-items:center;gap:16px;margin-top:18px}
-.demo-pct{font-family:"Space Grotesk";font-size:56px;color:var(--amber);letter-spacing:-.02em;min-width:150px}
-.demo-bar{flex:1;height:10px;background:#18212C;border-radius:99px;overflow:hidden}
+.demo-pct-row{display:flex;align-items:center;gap:18px;margin-top:18px}
+.demo-pct-col{flex:1;min-width:0}
+.demo-pct{font-family:"Space Grotesk";font-size:44px;color:var(--amber);letter-spacing:-.02em;line-height:1}
+.demo-bar{height:10px;background:#18212C;border-radius:99px;overflow:hidden;margin-top:12px}
 .demo-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--amber2));border-radius:99px;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.donut{position:relative;width:104px;height:104px;flex:none}
+.donut svg{transform:rotate(-90deg);display:block}
+.donut circle{fill:none;stroke-width:9;stroke-linecap:round}
+.donut .bg{stroke:#18212C}
+.donut .fg{stroke:url(#gradDonut);stroke-dasharray:283;stroke-dashoffset:283;transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.2,1);filter:drop-shadow(0 0 6px rgba(255,176,32,.45))}
+.donut b{position:absolute;inset:0;display:grid;place-items:center;font-family:"Space Grotesk";font-size:19px;color:var(--amber)}
+.donut span{position:absolute;left:0;right:0;bottom:-16px;text-align:center;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
 .demo-cap{font-size:12px;color:var(--mut);margin-top:10px}
 /* TICKER */
 .ticker{overflow:hidden;border-block:1px solid var(--line);background:#0D1219}
@@ -104,7 +112,6 @@ footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-wi
     <h1>30 segundos por nivel.<br/><span class="hl">El avance real de la obra.</span></h1>
     <p>Marca unidades, elige el estado y listo: AppControl convierte tu recorrido en el número que gerencia, costos y obra entienden. Incluso sin señal.</p>
     <div class="cta-row">
-      <a class="btn-p cta-big" href="/login.html">Entrar al sistema →</a>
       <a class="btn-s" href="#demo">Tocar la demo ↓</a>
     </div>
     <div class="micro">Sin papel · Sin llamadas · Tu trabajo queda firmado con fecha y usuario</div>
@@ -121,8 +128,23 @@ footer{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;max-wi
     <div class="demo-hint">👆 Toca las ventanas: así se registra en obra</div>
     <div class="tower" id="tower"></div>
     <div class="demo-pct-row">
-      <div class="demo-pct" id="pct">0%</div>
-      <div class="demo-bar"><i id="bar"></i></div>
+      <div class="donut" id="donut">
+        <svg width="104" height="104" viewBox="0 0 104 104">
+          <defs>
+            <linearGradient id="gradDonut" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFB020"/><stop offset="100%" stop-color="#FF8A00"/>
+            </linearGradient>
+          </defs>
+          <circle class="bg" cx="52" cy="52" r="45"/>
+          <circle class="fg" id="donutArc" cx="52" cy="52" r="45"/>
+        </svg>
+        <b id="donutPct">0%</b>
+        <span>avance de obra</span>
+      </div>
+      <div class="demo-pct-col">
+        <div class="demo-pct" id="pct">0%</div>
+        <div class="demo-bar"><i id="bar"></i></div>
+      </div>
     </div>
     <div class="demo-cap">Cada ventana es una unidad. El % es el avance del tramo. Así se ve tu obra en el dashboard.</div>
   </div>
@@ -188,8 +210,12 @@ floors.forEach(f=>{
 [0,1,4,5,9,10].forEach((i,k)=>{const v=[4,3,4,2,4,1][k];cells[i].dataset.v=v;cells[i].className="win w"+v;});
 function paint(){
   const avg=cells.reduce((s,c)=>s+VAL[+c.dataset.v],0)/cells.length;
-  document.getElementById("pct").textContent=Math.round(avg*100)+"%";
+  const pct=Math.round(avg*100);
+  document.getElementById("pct").textContent=pct+"%";
   document.getElementById("bar").style.width=(avg*100)+"%";
+  /* dona: circunferencia r=45 -> 283 */
+  document.getElementById("donutArc").style.strokeDashoffset=283-(avg*283);
+  document.getElementById("donutPct").textContent=pct+"%";
 }
 paint();
 

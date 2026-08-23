@@ -33,6 +33,9 @@ body::before{display:none}
   <div id="ins"></div>
   <h3 style="margin:16px 0 8px">Avance por capítulo (ponderado)</h3>
   <div id="caps"></div>
+  <h3 style="margin:16px 0 8px">Avance por nivel</h3>
+  <p style="color:var(--mut);font-size:12.5px;margin-bottom:8px">Cada nivel pondera sus actividades por la ponderación de la actividad y la de su capítulo.</p>
+  <div id="niveles"></div>
   <h3 style="margin:16px 0 8px">Actividades con mayor atraso</h3>
   <div id="late"></div>
   <h3 style="margin:16px 0 8px">Matriz nivel × unidad</h3>
@@ -64,6 +67,27 @@ function scopeCfg() {
 }
 function valOf(a, n, u) { const l = LAST.get(a + "|" + n + "|" + u); return l ? (VALOR[l.ESTADO] ?? 0) : 0; }
 function actAvance(a, rows) { const rs = rows.filter((r) => r.ACTIVIDAD === a); if (!rs.length) return 0; return rs.reduce((s, r) => s + valOf(a, r.NIVEL, r.UNIDAD), 0) / rs.length; }
+/* Avance por nivel: cada actividad pesa su ponderacion x la de su capitulo */
+function avancePorNivel(cfg) {
+  const capPond = new Map(D.capitulos.map((c) => [c.CODIGO, num(c.PONDERACION)]));
+  const actInfo = new Map(D.actividades.map((a) => [a.CODIGO, a]));
+  const porNivel = {};
+  for (const r of cfg) {
+    const k = String(r.NIVEL);
+    (porNivel[k] ||= {});
+    (porNivel[k][r.ACTIVIDAD] ||= []).push(r);
+  }
+  const filas = Object.entries(porNivel).map(([n, acts]) => {
+    let av = 0;
+    for (const [a, rows] of Object.entries(acts)) {
+      const info = actInfo.get(a);
+      const pond = num(info?.PONDERACION) * capPond.get(String(info?.CAPITULO ?? "")) || 0;
+      av += actAvance(a, rows) * pond;
+    }
+    return { n, pct: Math.min(100, av * 100) };
+  });
+  return filas.sort((x, y) => +x.n - +y.n);
+}
 function compute() {
   const cfg = scopeCfg();
   fill($("#torre"), torres(), (t) => ({ v: t, t }), true);
@@ -88,6 +112,7 @@ function compute() {
      <div class='kpi'><b>${listoPct}%</b><span>Unidades listas</span></div>
      <div class='kpi'><b>${semana}</b><span>Registros 7 días</span></div>`;
   $("#caps").innerHTML = caps.map((c) => `<div class='cap'><h3><span>${esc(c.NOMBRE)}</span><span>${c.avance.toFixed(1)}% · pond ${(num(c.PONDERACION) * 100).toFixed(0)}%</span></h3><div class='bar'><i style='width:${c.avance}%'></i></div></div>`).join("");
+  $("#niveles").innerHTML = avancePorNivel(cfg).map((x) => `<div class='cap'><h3><span>NIVEL ${esc(x.n)}</span><span>${x.pct.toFixed(0)}%</span></h3><div class='bar'><i style='width:${x.pct}%'></i></div></div>`).join("") || "<p class='msg'>Sin datos por nivel.</p>";
   const late = [...new Set(cfg.map((r) => r.ACTIVIDAD))].map((a) => ({ a, av: actAvance(a, cfg) })).sort((x, y) => x.av - y.av).slice(0, 5);
   $("#late").innerHTML = late.map((l) => `<div class='cap'><h3><span>${esc(l.a)}</span><span>${(l.av * 100).toFixed(0)}%</span></h3><div class='bar'><i style='width:${l.av * 100}%'></i></div></div>`).join("") || "<p class='msg'>Sin datos.</p>";
   const ins = [];
