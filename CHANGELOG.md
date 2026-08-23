@@ -2,6 +2,18 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado: semver.
 
+## [1.7.0] - 2026-08-23
+### Added
+- Registro móvil táctil: tocar una celda cicla el estado (con color y % al instante), long-press selecciona unidades para aplicar en lote, botón Deshacer y contador de cambios sin guardar.
+- Asignación validada de usuarios: selects en cascada empresa > proyecto > torre; torres reales del proyecto (unión NIVELES + UNIDADES) vía acción `torres-list`.
+- Rol de admin desarrollador (`DEVELOPER_ADMINS`): puede crear usuarios en cualquier proyecto activo y gestionar organizaciones (`empresas-save`, `proyectos-save`).
+- Regla por rol: torre `*` solo para ADMIN/VISUALIZADOR; RESIDENTE exige torre concreta.
+- Tabla de usuarios con columnas Empresa y Proyecto.
+- Script `enriquecer-demo.mjs`: torre T2 del demo P000 con lobby, zona administrativa, parqueaderos, apartamentos 401–2106 y amenidades (23 niveles, 127 unidades).
+### Changed
+- Relaciones de catálogos corregidas: actividades filtradas por capítulos del proyecto activo + ACTIVO=SI; contratistas solo ACTIVO=SI.
+- Aislamiento por tenant en creación/edición de usuarios (403 fuera del propio proyecto salvo desarrollador).
+
 ## [1.6.0] - 2026-08-23
 ### Changed
 - Recuperación de contraseña sin correo: el PIN ya no se envía por email (no se requieren Resend ni dominio propio). El PIN queda visible en el módulo Usuarios para cualquier ADMIN del proyecto, quien lo comparte directamente con el usuario.
