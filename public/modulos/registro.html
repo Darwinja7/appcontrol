@@ -17,6 +17,9 @@ label.cell:hover{transform:scale(1.05);border-color:#1D3552}
 label.cell input{display:none}
 label.cell.sel{border-color:var(--amber);background:rgba(255,176,32,.08);box-shadow:0 0 14px rgba(255,176,32,.35)}
 label.cell.pend{border-style:dashed;border-color:var(--amber)}
+label.cell .done{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:6px;border:1px solid #202A36;background:#0B0F14;color:#245C43;font-size:12px;font-weight:800;line-height:1;cursor:pointer;padding:0}
+label.cell .done.on{background:#245C43;color:#D5EFE2}
+label.cell{position:relative}
 label.cell .pct{font-size:11px;font-weight:800;color:#EAF0F6;text-shadow:0 1px 2px rgba(0,0,0,.7)}
 label.cell .chip{min-width:54px;text-align:center;pointer-events:none}
 .avbar{height:8px;border-radius:6px;background:#202A36;overflow:hidden;min-width:52px}
@@ -78,9 +81,18 @@ const esPorNivel = (a) => (String((D.actividades || []).find((x) => x.CODIGO ===
 
 function estadoEfectivo(a, n, u) {
   const k = n + "|" + u;
-  if (PEND.has(a + "|" + k)) return PEND.get(a + "|" + k);
+  if (PEND.has(a + "|" + k)) {
+    const p = PEND.get(a + "|" + k);
+    if (typeof p === "number") return { st: "Manual", pct: Math.round(p) };
+    return { st: p, pct: Math.round((VALOR[p] ?? 0) * 100) };
+  }
   const last = LAST.get(a + "|" + k);
-  return last ? last.ESTADO : "Sin empezar";
+  if (!last) return { st: "Sin empezar", pct: 0 };
+  if (String(last.ESTADO) === "Manual") {
+    const v = parseFloat(String(last.VALOR ?? "").replace(",", "."));
+    return { st: "Manual", pct: isNaN(v) ? 0 : Math.round(v * 100) };
+  }
+  return { st: last.ESTADO, pct: Math.round((VALOR[last.ESTADO] ?? 0) * 100) };
 }
 
 function render() {
@@ -103,7 +115,6 @@ function render() {
   $("#box").innerHTML = html;
   wireCeldas();
 }
-
 function renderPorNivel(a, cells) {
   const niveles = [...new Set(cells.map((r) => r.NIVEL))].sort((x, y) => +x - +y);
   let html = "<table class='grid'><tr><th>NIVEL</th><th>AV.</th><th>Estado del nivel</th></tr>";
@@ -118,13 +129,16 @@ function renderPorNivel(a, cells) {
 }
 
 function celdaRegistro(a, n, u, vals) {
-  const st = estadoEfectivo(a, n, u);
-  vals.push(VALOR[st] ?? 0);
+  const ef = estadoEfectivo(a, n, u);
+  vals.push(ef.pct / 100);
   const k = n + "|" + u;
   const pend = PEND.has(a + "|" + k);
-  return `<td><label class='cell ${SEL.has(k) ? "sel" : ""} ${pend ? "pend" : ""}' data-k='${esc(k)}' data-st='${esc(st)}'>` +
-    `<span class='chip st${ESTADOS.indexOf(st)}'>${esc(st.substring(0, 3))}</span>` +
-    `<span class='pct'>${Math.round((VALOR[st] ?? 0) * 100)}%</span>` +
+  const etiqueta = ef.st === "Manual" ? "MAN" : ef.st.substring(0, 3);
+  const listo = ef.pct >= 100;
+  return `<td><label class='cell ${SEL.has(k) ? "sel" : ""} ${pend ? "pend" : ""}' data-k='${esc(k)}' data-st='${esc(ef.st)}'>` +
+    `<button type='button' class='done ${listo ? "on" : ""}' title='Realizado'>${listo ? "✓" : ""}</button>` +
+    `<span class='chip' style='background:${colorAv(ef.pct / 100)};color:#EAF0F6'>${esc(etiqueta)}</span>` +
+    `<span class='pct' title='Porcentaje manual'>${ef.pct}%</span>` +
     `</label></td>`;
 }
 
@@ -143,6 +157,29 @@ function wireCeldas() {
     el.addEventListener("touchstart", () => { largo = false; timer = setTimeout(() => { largo = true; toggleSel(k); }, 450); }, { passive: true });
     ["touchend", "touchmove", "touchcancel"].forEach((ev) => el.addEventListener(ev, () => clearTimeout(timer), { passive: true }));
     el.addEventListener("contextmenu", (e) => { e.preventDefault(); toggleSel(k); });
+    el.querySelector(".done").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const a = $("#actividad").value;
+      const [n, u] = k.split("|");
+      const actual = estadoEfectivo(a, n, u);
+      PEND.set(a + "|" + k, actual.pct >= 100 ? "Sin empezar" : "Listo");
+      SEL.delete(k);
+      render();
+    });
+    el.querySelector(".pct").addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearTimeout(timer);
+      const a = $("#actividad").value;
+      const [n, u] = k.split("|");
+      const actual = estadoEfectivo(a, n, u);
+      const entrada = prompt("Porcentaje de avance (0-100) para " + n + "/" + u + ":", String(actual.pct));
+      if (entrada === null) return;
+      const v = parseFloat(entrada.replace(",", "."));
+      if (isNaN(v) || v < 0 || v > 100) { alert("Porcentaje inválido."); return; }
+      PEND.set(a + "|" + k, Math.round(v));
+      SEL.delete(k);
+      render();
+    });
     el.addEventListener("click", () => {
       if (largo) { largo = false; return; }
       ciclar(k, el.dataset.st);
@@ -153,7 +190,10 @@ function wireCeldas() {
 
 function ciclar(k, stActual) {
   const a = $("#actividad").value;
-  const nuevo = siguiente(stActual);
+  const [n, u] = k.split("|");
+  const ef = estadoEfectivo(a, n, u);
+  const bucket = ef.pct >= 100 ? "Listo" : ef.pct >= 80 ? "En remate" : ef.pct >= 50 ? "En curso" : ef.pct >= 10 ? "En replanteo" : "Sin empezar";
+  const nuevo = siguiente(bucket);
   PEND.set(a + "|" + k, nuevo);
   SEL.delete(k);
   render();
@@ -181,11 +221,12 @@ async function guardar() {
   if (!PEND.size && !SEL.size) { alert("No hay cambios que guardar."); return; }
   const sampleDe = (act) => cfgHab().find((r) => r.ACTIVIDAD === act);
   let items = [];
-  for (const [ak, est] of PEND) {
+  for (const [ak, p] of PEND) {
     const i1 = ak.indexOf("|"), i2 = ak.indexOf("|", i1 + 1);
     const actId = ak.slice(0, i1), n = ak.slice(i1 + 1, i2), u = ak.slice(i2 + 1);
     const s = sampleDe(actId); if (!s) continue;
-    items.push({ proyecto: s.PROYECTO, torre: s.TORRE, actividad: actId, nivel: n, unidad: u, estado: est });
+    const base = { proyecto: s.PROYECTO, torre: s.TORRE, actividad: actId, nivel: n, unidad: u };
+    items.push(typeof p === "number" ? { ...base, pct: p } : { ...base, estado: p });
   }
   if (SEL.size) {
     const est = $("#estado").value;

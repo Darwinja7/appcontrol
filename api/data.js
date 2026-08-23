@@ -1,5 +1,5 @@
 import { readRows, appendRows, replaceRows } from "./_lib/sheets.js";
-import { HEADERS, VALORES, habilitado } from "./_lib/model.js";
+import { HEADERS, VALORES, habilitado, UNIDAD_NIVEL } from "./_lib/model.js";
 import { currentUser } from "./_lib/session.js";
 
 // Tope de filas de REGISTRO enviadas al cliente en cada catálogo:
@@ -15,7 +15,7 @@ const num = (v) => { const n = parseFloat(String(v ?? "0").replace(",", ".")); r
  * Misma matemática que el dashboard: actividad -> capitulo -> proyecto.
  * Devuelve { general, niveles:[{n,pct}], unidades:[{u,pct}] } en porcentaje 0-100.
  */
-export function calcularAvance(cfgRows, actividades, capitulos, registroRows, proyecto) {
+export function calcularAvance(cfgRows, actividades, capitulos, registroRows, proyecto, unidadesRows = []) {
   const capPond = new Map(capitulos.map((c) => [String(c.CODIGO), num(c.PONDERACION)]));
   const actInfo = new Map(actividades.map((a) => [String(a.CODIGO), a]));
 
@@ -26,9 +26,29 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
     const k = r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD;
     if (!last.has(k) || String(r.FECHA) > String(last.get(k).FECHA)) last.set(k, r);
   }
-  const valOf = (r) => {
-    const l = last.get(r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD);
-    return l ? (VALORES[l.ESTADO] ?? 0) : 0;
+  const valDe = (l) => {
+    if (!l) return 0;
+    if (String(l.ESTADO) === "Manual") return num(l.VALOR);
+    return VALORES[l.ESTADO] ?? 0;
+  };
+  const valOf = (a, n, u) => valDe(last.get(a + "|" + n + "|" + u));
+
+  // Unidades activas por torre|nivel: para filas de configuracion por NIVEL el
+  // valor es el promedio del nivel (todas sus unidades comparten avance).
+  const unidadesPorNivel = new Map();
+  for (const x of unidadesRows) {
+    if (String(x.ACTIVO || "").toUpperCase() !== "SI") continue;
+    const k = String(x.TORRE || "") + "|" + String(x.NIVEL || "");
+    if (!unidadesPorNivel.has(k)) unidadesPorNivel.set(k, []);
+    unidadesPorNivel.get(k).push(String(x.UNIDAD || ""));
+  }
+  const valFila = (r) => {
+    if (String(r.UNIDAD) === UNIDAD_NIVEL) {
+      const us = unidadesPorNivel.get(String(r.TORRE || "") + "|" + String(r.NIVEL || "")) || [];
+      if (us.length) return us.reduce((s, un) => s + valOf(r.ACTIVIDAD, r.NIVEL, un), 0) / us.length;
+      return valOf(r.ACTIVIDAD, r.NIVEL, UNIDAD_NIVEL);
+    }
+    return valOf(r.ACTIVIDAD, r.NIVEL, r.UNIDAD);
   };
   const habilitadas = cfgRows.filter((r) => String(r.PROYECTO || "") === String(proyecto) && habilitado(r));
 
@@ -39,16 +59,24 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
     const info = actInfo.get(String(r.ACTIVIDAD));
     if (!info) continue;
     const pond = num(info.PONDERACION) * (capPond.get(String(info.CAPITULO)) ?? 0);
-    const v = valOf(r) * pond;
+    const v = valFila(r) * pond;
     general += v;
     const nk = String(r.NIVEL);
     (porNivel[nk] ||= { suma: 0, pond: 0 });
     porNivel[nk].suma += v;
     porNivel[nk].pond += pond;
-    const uk = String(r.UNIDAD);
-    (porUnidad[uk] ||= { suma: 0, pond: 0 });
-    porUnidad[uk].suma += v;
-    porUnidad[uk].pond += pond;
+    if (String(r.UNIDAD) === UNIDAD_NIVEL) {
+      // La actividad de nivel aporta a cada unidad del nivel (mismo avance).
+      for (const un of unidadesPorNivel.get(String(r.TORRE || "") + "|" + nk) || []) {
+        (porUnidad[un] ||= { suma: 0, pond: 0 });
+        porUnidad[un].suma += v;
+        porUnidad[un].pond += pond;
+      }
+    } else {
+      (porUnidad[String(r.UNIDAD)] ||= { suma: 0, pond: 0 });
+      porUnidad[String(r.UNIDAD)].suma += v;
+      porUnidad[String(r.UNIDAD)].pond += pond;
+    }
   }
   return {
     general: Math.min(100, general * 100),
@@ -64,13 +92,13 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
  */
 async function snapshotDiaria(proyecto) {
   try {
-    const [hist, cfg, acts, caps, registro] = await Promise.all([
+    const [hist, cfg, acts, caps, registro, unidades] = await Promise.all([
       readRows("HISTORICO"), readRows("CONFIGURACION"), readRows("ACTIVIDADES"),
-      readRows("CAPITULOS"), readRows("REGISTRO")
+      readRows("CAPITULOS"), readRows("REGISTRO"), readRows("UNIDADES")
     ]);
     const hoy = new Date().toISOString().slice(0, 10);
     if (hist.some((h) => String(h.PROYECTO || "") === String(proyecto) && String(h.FECHA || "").slice(0, 10) === hoy)) return;
-    const av = calcularAvance(cfg, acts, caps, registro, proyecto);
+    const av = calcularAvance(cfg, acts, caps, registro, proyecto, unidades);
     const fecha = new Date().toISOString();
     const filas = [[fecha, proyecto, "GENERAL", av.general.toFixed(1)]];
     for (const n of av.niveles) filas.push([fecha, proyecto, "NIVEL:" + n.n, n.pct.toFixed(1)]);
@@ -139,19 +167,45 @@ export default async function handler(req, res) {
     if (a === "registro-save") {
       const items = (req.body || {}).items || [];
       if (!items.length) return res.status(400).json({ success: false });
-      const cfg = await readRows("CONFIGURACION");
-      const map = new Map(cfg.map((r) => [[r.TORRE, r.ACTIVIDAD, r.NIVEL, r.UNIDAD].join("|"), r]));
-      const fecha = new Date().toISOString();
-      const rows = [];
-      for (const it of items) {
-        // El proyecto SIEMPRE viene del token, nunca del cliente.
-        // Estados fuera del catálogo se descartan.
+    const cfg = await readRows("CONFIGURACION");
+    const map = new Map(cfg.map((r) => [[r.TORRE, r.ACTIVIDAD, r.NIVEL, r.UNIDAD].join("|"), r]));
+    const fecha = new Date().toISOString();
+    const rows = [];
+    let unidadesCache = null;
+    for (const it of items) {
+      // El proyecto SIEMPRE viene del token, nunca del cliente.
+      // Dos modos: estado del catalogo o porcentaje manual 0-100.
+      let estado, valor;
+      if (it.pct !== undefined && it.pct !== null && String(it.pct).trim() !== "") {
+        const p = num(it.pct);
+        if (p < 0 || p > 100) continue;
+        estado = "Manual";
+        valor = String(Math.round(p) / 100);
+      } else {
         if (!ESTADOS_VALIDOS.has(it.estado)) continue;
-        const row = map.get([it.torre, it.actividad, it.nivel, it.unidad].join("|"));
-        if (!row || !habilitado(row)) continue;
-        rows.push([fecha, u.PROYECTO, it.torre, row.CAPITULO, it.actividad, String(it.nivel), it.unidad,
-          it.estado, String(VALORES[it.estado] ?? 0), row.CONTRATISTA, u.SENDER_ID || u.EMAIL]);
+        estado = it.estado;
+        valor = String(VALORES[it.estado] ?? 0);
       }
+      // Actividad por NIVEL: se valida contra su fila de configuracion
+      // ("NIVEL") pero se registra una fila por unidad activa del nivel —
+      // todas heredan el mismo avance. Sin unidades aun, cae como fila NIVEL.
+      let destinos = [it.unidad];
+      if (String(it.unidad) === UNIDAD_NIVEL) {
+        if (!unidadesCache) unidadesCache = await readRows("UNIDADES");
+        const delNivel = unidadesCache.filter((x) =>
+          String(x.PROYECTO || "") === u.PROYECTO && x.TORRE === it.torre &&
+          String(x.NIVEL || "") === String(it.nivel) && String(x.ACTIVO || "").toUpperCase() === "SI"
+        ).map((x) => x.UNIDAD);
+        if (delNivel.length) destinos = delNivel;
+      }
+      for (const destino of destinos) {
+        const row = map.get([it.torre, it.actividad, it.nivel, UNIDAD_NIVEL].join("|")) ||
+          map.get([it.torre, it.actividad, it.nivel, it.unidad].join("|"));
+        if (!row || !habilitado(row)) continue;
+        rows.push([fecha, u.PROYECTO, it.torre, row.CAPITULO, it.actividad, String(it.nivel), destino,
+          estado, valor, row.CONTRATISTA, u.SENDER_ID || u.EMAIL]);
+      }
+    }
       if (rows.length) {
         await appendRows("REGISTRO", HEADERS.REGISTRO, rows);
         await snapshotDiaria(u.PROYECTO);

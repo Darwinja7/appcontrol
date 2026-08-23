@@ -112,8 +112,23 @@ function scopeCfg() {
   const ct = $("#contratista").value; if (ct) rows = rows.filter((r) => r.CONTRATISTA === ct);
   return rows;
 }
-function valOf(a, n, u) { const l = LAST.get(a + "|" + n + "|" + u); return l ? (VALOR[l.ESTADO] ?? 0) : 0; }
-function actAvance(a, rows) { const rs = rows.filter((r) => r.ACTIVIDAD === a); if (!rs.length) return 0; return rs.reduce((s, r) => s + valOf(a, r.NIVEL, r.UNIDAD), 0) / rs.length; }
+function valOf(a, n, u) {
+  const l = LAST.get(a + "|" + n + "|" + u);
+  if (!l) return 0;
+  if (String(l.ESTADO) === "Manual") { const v = parseFloat(String(l.VALOR ?? "").replace(",", ".")); return isNaN(v) ? 0 : v; }
+  return VALOR[l.ESTADO] ?? 0;
+}
+function actAvance(a, rows) {
+  if (!rows.length) return 0;
+  let suma = 0;
+  for (const r of rows) {
+    if (String(r.UNIDAD) === "NIVEL") {
+      const us = D.unidades.filter((x) => x.PROYECTO === $("#proyecto").value && x.TORRE === r.TORRE && String(x.NIVEL) === String(r.NIVEL) && String(x.ACTIVO).toUpperCase() === "SI");
+      suma += us.length ? us.reduce((s, x) => s + valOf(a, r.NIVEL, x.UNIDAD), 0) / us.length : valOf(a, r.NIVEL, "NIVEL");
+    } else suma += valOf(a, r.NIVEL, r.UNIDAD);
+  }
+  return suma / rows.length;
+}
 /* Avance por nivel: cada actividad pesa su ponderacion x la de su capitulo */
 function avancePorNivel(cfg) {
   const capPond = new Map(D.capitulos.map((c) => [c.CODIGO, num(c.PONDERACION)]));
@@ -151,7 +166,7 @@ function compute() {
     caps.push({ ...cap, avance: capPct });
   }
   general = Math.min(100, general * 100);
-  const listoPct = cfg.length ? Math.round((cfg.filter((r) => (LAST.get(r.ACTIVIDAD + "|" + r.NIVEL + "|" + r.UNIDAD) || {}).ESTADO === "Listo").length / cfg.length) * 100) : 0;
+  const listoPct = cfg.length ? Math.round((cfg.filter((r) => actAvance(r.ACTIVIDAD, [r]) >= 0.999).length / cfg.length) * 100) : 0;
   const semana = D.registro.filter((r) => new Date(r.FECHA) > new Date(Date.now() - 7 * 864e5)).length;
   $("#kpis").innerHTML =
     `<div class='kpi'><b>${general.toFixed(1)}%</b><span>Avance proyecto</span></div>
