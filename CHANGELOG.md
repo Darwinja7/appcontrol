@@ -6,6 +6,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado:
 ### Added
 - Recuperación de contraseña: el PIN llega por correo a todos los administradores activos del proyecto (Resend); el solicitante solo ve la indicación de comunicarse con el administrador. El panel de PINs del módulo de usuarios queda como respaldo.
 - `/api/health` reporta `mailConfigurado` (booleano) para verificar RESEND_API_KEY/MAIL_FROM sin exponer secretos.
+- Script `proteger-password-hash.mjs`: crea un rango protegido sobre la columna PASSWORD_HASH de USUARIOS (solo la service account puede escribir; edición manual bloqueada en la interfaz de Sheets). Idempotente.
 
 ### Changed
 - Plantilla del correo de recuperación redactada para el administrador: incluye quién solicitó el cambio, en qué proyecto, el PIN compartible y su vencimiento (15 minutos).
