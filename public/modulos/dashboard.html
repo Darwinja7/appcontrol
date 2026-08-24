@@ -149,10 +149,17 @@ function avancePorNivel(cfg) {
 }
 function compute() {
   const cfg = scopeCfg();
-  fill($("#torre"), torres(), (t) => ({ v: t, t }), true);
-  fill($("#capitulo"), D.capitulos.filter((c) => c.PROYECTO === $("#proyecto").value), (c) => ({ v: c.CODIGO, t: c.NOMBRE }), true);
-  fill($("#contratista"), D.contratistas, (c) => ({ v: c.CODIGO, t: c.NOMBRE }), true);
-  fill($("#actividad"), [...new Set(cfg.map((r) => r.ACTIVIDAD))].map((a) => ({ a })), (x) => ({ v: x.a, t: x.a }), false);
+  /* Rellenar un select borra su seleccion; se conserva el valor vigente si
+     sigue existiendo para que cambiar un filtro no borre los demas. */
+  const fillConservando = (id, items, map, conTodas) => {
+    const prev = $("#" + id).value;
+    fill($("#" + id), items, map, conTodas);
+    if ([...$("#" + id).options].some((o) => o.value === prev)) $("#" + id).value = prev;
+  };
+  fillConservando("torre", torres(), (t) => ({ v: t, t }), true);
+  fillConservando("capitulo", D.capitulos.filter((c) => c.PROYECTO === $("#proyecto").value), (c) => ({ v: c.CODIGO, t: c.NOMBRE }), true);
+  fillConservando("contratista", D.contratistas, (c) => ({ v: c.CODIGO, t: c.NOMBRE }), true);
+  fillConservando("actividad", [...new Set(cfg.map((r) => r.ACTIVIDAD))].map((a) => ({ a })), (x) => ({ v: x.a, t: x.a }), false);
   let general = 0; const caps = [];
   for (const cap of D.capitulos.filter((c) => c.PROYECTO === $("#proyecto").value)) {
     let capAv = 0;
