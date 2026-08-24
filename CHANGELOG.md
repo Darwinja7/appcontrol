@@ -11,6 +11,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado:
 ### Changed
 - Plantilla del correo de recuperación redactada para el administrador: incluye quién solicitó el cambio, en qué proyecto, el PIN compartible y su vencimiento (15 minutos).
 
+### Fixed
+- Registro móvil: el tap no ciclaba el estado — la celda usaba un `<label>` que reenviaba nativamente el clic al botón ✓ interno y el doble disparador se anulaba. Ahora es un `<div>` y el ciclo completo (Sin empezar → En replanteo → En curso → En remate → Listo → Sin empezar) funciona con cada tap; también desbloqueó el % manual por celda.
+
 ## [1.9.1] - 2026-08-23
 ### Security
 - Política BYOK (Bring Your Own Key): se elimina el respaldo con variables de entorno del servidor. Cada administrador configura y paga su propio consumo de IA; su llave vive cifrada en LLM_CONFIG y jamás se comparte entre empresas.
