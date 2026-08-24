@@ -79,13 +79,26 @@ actividad -> capitulo -> proyecto. Todo sobre Google Sheets como base de datos.
 
 ## Funcionalidades vigentes
 
-- Grid de registro offline-first (cola localStorage, sync automatica), seleccion
-  multiple con estilo landing (borde ambar + glow)
-- Dashboard: KPIs, avance por capitulo, **avance por nivel** (ponderado act x cap),
-  **grafica de avance en el tiempo** (SVG, snapshots de HISTORICO), matriz nivel x unidad
+- **Tres modos de aplicacion por actividad** (columna APLICACION + ZONA en ACTIVIDADES):
+  UNIDAD = por apartamento (normal) | NIVEL = especial de nivel completo (losa, mov.
+  tierras) | ZONA = zona fija presente en todos los niveles ("PUNTO FIJO": escaleras,
+  ascensor, barandas metalicas, puertas cortafuego). Se edita en Configuracion
+  (accion actividades-save); al cambiar de modo la configuracion se colapsa sola
+  conservando contratista (normalizarConfigPorModo en model.js, idempotente).
+- Grid de registro unico niveles x zonas/apartamentos con filtro de ambito
+  (Todos/Apartamentos/Zona punto fijo/Especiales por nivel), offline-first (cola
+  localStorage, sync automatica), tap cicla estado, long-press multi-seleccion entre
+  niveles distintos, % manual, boton realizado. El backend guarda una fila normal con
+  la clave exacta (apartamento, zona o NIVEL) SIN expansion a unidades.
+- Avance general = por actividad: promedio entre sus filas habilitadas x ponderacion
+  de actividad x capitulo, UNA sola vez por actividad (dashboard y calcularAvance
+  usan el mismo criterio). Detalle por nivel/unidad se normaliza solo al dividir.
+- Dashboard: KPIs, avance por capitulo, avance por nivel (ponderado act x cap),
+  grafica de avance en el tiempo (SVG, snapshots de HISTORICO), matriz nivel x unidad
+  (las zonas aparecen como columna propia)
 - Configuracion: regla de oro (HABILITADO = APLICA SI + ACTIVO SI + CONTRATISTA asignado)
 - HISTORICO: snapshot diario automatico tras cada registro-save (dedupe por dia);
-  ambitos GENERAL / NIVEL:x / UNIDAD:x. Backfill del demo: scripts/backfill-historico.mjs
+  ambitos GENERAL / NIVEL:x / UNIDAD:x. Backfill del demo: scripts/reiniciar-demo.mjs
 - Usuarios: crear (contrasena temporal aleatoria mostrada una vez), activar/desactivar,
   reset con cambio obligatorio; roles ADMIN/RESIDENTE/VISUALIZADOR
 - Landing: dona SVG animada como unico indicador de avance (sin barra duplicada),
@@ -118,20 +131,26 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
    PIN~~ **RESUELTO 2026-08-23**: variables configuradas, redeploy d6adb15,
    health mailConfigurado:true, flujo E2E completo PASS (ver sesion v1.9.3).
 2. Prueba fisica de dictado por voz en Chrome Android (en escritorio ya verificada)
-3. Borrar de USUARIOS la fila inactiva prueba.residente@test.com si molesta
+3. ~~Borrar de USUARIOS la fila inactiva prueba.residente@test.com si molesta~~
+   USUARIOS queda limpio: solo darwingranadosjimenez@gmail.com (v1.10.0)
 4. Roadmap del README: cronograma programado vs ejecutado, costos/fiduciaria,
    entregas y postventa, adapter Supabase
 5. CSP actual permite 'unsafe-inline' en scripts (los modulos usan <script> inline);
    migrarlos a /js/*.js para CSP estricta
-6. **DESARROLLO EN PAUSA** (decision del usuario): la app queda funcional;
-   retomar con los items de este roadmap cuando se reinicie
+6. **Fase siguiente acordada**: agente IA entendiendo zonas — wizard-chat y el
+   prompt de llm.js deben listar APLICACION/ZONA y generar registros con la clave
+   de zona; estructura-save ya acepta aplicacion/zona al crear actividades.
+7. Configurar P001 (SALGUERO ELITE 2, produccion): esta vacio (sin niveles,
+   unidades ni configuracion); se puede arrancar con el modo guiado del asistente.
+8. **DESARROLLO EN PAUSA** entre sesiones: la app queda funcional; retomar con
+   los items de este roadmap cuando se reinicie
 
 ## Convenciones
 
 - Commits: Conventional Commits en espanol; push directo a main (el usuario ya
   autorizo que el agente commitee y pushee)
 - Comentarios y UI: SIEMPRE en espanol natural (skill humanizalo instalada)
-- CHANGELOG.md: Keep a Changelog, version actual 1.5.0
+- CHANGELOG.md: Keep a Changelog, version actual 1.10.0
 - 50 skills instaladas en ~/.claude/skills/ (40 de tododeia + el-arquitecto +
   video-generator + design-md + economia-de-contexto + rtk-ahorro-tokens +
   patrones-llm-apps + evolucion-de-agente + studio-generativo + browser-harness +
@@ -209,3 +228,43 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
 - Nota operativa: /login redirige a /app.html si hay sesion valida — para probar el
   panel de recuperacion hay que cerrar sesion primero (btn-logout del shell).
 - Pendiente restante del flujo: nada. Solo voz fisica en Android (pendiente 2).
+
+## Cierre del loop v1.10.0 (2026-08-23) — grid niveles x zonas/apartamentos
+
+- Modelo nuevo de 3 modos por actividad (UNIDAD/NIVEL/ZONA + columna ZONA en el
+  maestro). Zona = punto fijo presente en todos los niveles; se registra nivel a
+  nivel SIN tocar apartamentos. El backend guarda filas normales con la clave
+  exacta: SE ELIMINO la expansion de registros NIVEL a unidades.
+- Registro: grid unico + filtro de ambito (chips). Configuracion: seccion
+  "Aplicacion de actividades" (actividades-save colapsa config al cambiar modo,
+  conserva contratista, recalcula HABILITADO). Dashboard muestra la zona como
+  columna propia en la matriz.
+- Datos demo reconstruidos con scripts/reiniciar-demo.mjs (idempotente): borra
+  REGISTRO/HISTORICO de ejemplo, ACT001->NIVEL, ACT003/005/006/007->ZONA PUNTO
+  FIJO (ascensor, barandas y cortafuego creados; ponderaciones rebalanceadas a
+  suma 1.0 por capitulo), 205 filas de configuracion T2, 56 registros nuevos e
+  historico interpolado. Avance demo realista: ~15.8%.
+- Bugs encontrados y corregidos en el loop:
+  1. Avance general saturaba al 100%: calcularAvance sumaba fila a fila sin
+     promediar por actividad -> ahora promedio x ponderacion una vez (e38d673).
+  2. Dashboard diluia el avance dividiendo entre TODAS las filas del proyecto
+     en vez de las de cada actividad (34ad4b2).
+  3. Dashboard borraba la seleccion de los selects al recalcular -> la matriz
+     nivel x unidad quedaba siempre vacia; ahora fillConservando() preserva
+     valores vigentes (73b4a64).
+  4. reiniciar-demo dejaba residuos de T1 en P000 (la QA admin torre * veia
+     ambas torres mezcladas); limpia todo el proyecto demo (9faa706).
+- Verificacion E2E en produccion con usuario QA ADMIN temporal (crear-usuario-
+  prueba.mjs acepta rol/torre): filtro por ambito OK, grid zona 1 columna
+  PUNTO FIJO OK, grid especial "Todo el nivel" OK, multi-seleccion entre
+  niveles distintos OK, guardado real verificado en la hoja (ACT006 niv7/9 En
+  curso CT03; ACT007 niv8 tap En curso; niv9 Manual 65%), cambio de modo
+  ACT090->ZONAS COMUNES reajusto 216 filas, smoke.mjs TODO EN VERDE, dashboard
+  15.8% = backend. Limpieza: usuario QA eliminado; USUARIOS solo admin real;
+  demo reiniciado a estado limpio al final.
+- Tests: scripts/test-zona.mjs nuevo (imports reales del modelo: modos,
+  normalizacion idempotente, renombre de zona, avance ponderado, regresion de
+  saturacion con 10 niveles). Retirados test-expansion-nivel.cjs y
+  test-por-nivel.cjs (modelo antiguo). Suite local completa en verde.
+- Pendiente fase siguiente: agente IA entendiendo zonas (wizard-chat + prompt
+  llm.js) y configurar P001 real (pendientes 6 y 7).

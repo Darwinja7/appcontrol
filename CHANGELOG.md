@@ -2,6 +2,25 @@
 
 Formato: [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) · Versionado: semver.
 
+## [1.10.0] - 2026-08-23
+### Added
+- Tres modos de aplicación por actividad: **por apartamento** (lo normal), **todo el nivel** (especiales: vaciado de losa, movimiento de tierras) y **zona fija presente en cada nivel** (punto fijo: escaleras, ascensor, barandas metálicas, puertas cortafuego).
+- Columna `ZONA` en el maestro ACTIVIDADES y acción `actividades-save` (solo ADMIN): se cambia el modo desde Configuración y la configuración existente se reajusta sola, conservando contratista.
+- Registro con grid único **niveles × zonas o apartamentos** y filtro de ámbito: Todos / Apartamentos / Zona punto fijo / Especiales por nivel. Se conservan tap para ciclar, long-press multi-selección entre niveles distintos, % manual, botón realizado y cola offline.
+- Script `reiniciar-demo.mjs`: borra los registros de ejemplo (REGISTRO e HISTORICO), reconstruye la configuración del demo sin residuos, crea las actividades de zona con ponderaciones rebalanceadas (cada capítulo suma 1.0), genera registros nuevos coherentes e histórico interpolado.
+
+### Changed
+- El registro del backend es normal: una fila con la clave exacta que se marcó (apartamento, zona o `NIVEL`), sin expansión a unidades del nivel.
+- Avance general: cada actividad aporta su **promedio** entre las filas donde está habilitada × su ponderación una sola vez. Antes se sumaba fila a fila y habilitar una actividad en muchos niveles saturaba el avance al 100%.
+
+### Fixed
+- Dashboard: el avance por capítulo dividía entre todas las filas del proyecto en vez de entre las de cada actividad (dilución con muchos apartamentos habilitados).
+- Dashboard: cambiar un filtro borraba las selecciones de los demás selects y la matriz nivel × unidad quedaba siempre vacía.
+- `reiniciar-demo.mjs` limpia todas las torres del proyecto demo, no solo T2, para no dejar configuraciones residuales.
+
+### Removed
+- `test-expansion-nivel.cjs` y `test-por-nivel.cjs` probaban la expansión del modelo antiguo; los reemplaza `scripts/test-zona.mjs` (modos, normalización idempotente, avance ponderado con registros normales).
+
 ## [1.9.2] - 2026-08-23
 ### Added
 - Recuperación de contraseña: el PIN llega por correo a todos los administradores activos del proyecto (Resend); el solicitante solo ve la indicación de comunicarse con el administrador. El panel de PINs del módulo de usuarios queda como respaldo.
