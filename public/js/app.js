@@ -5,6 +5,17 @@ const $ = (s) => document.querySelector(s);
 const ESTADOS = ["Sin empezar", "En replanteo", "En curso", "En remate", "Listo"];
 const VALOR = { "Sin empezar": 0, "En replanteo": 0.1, "En curso": 0.5, "En remate": 0.8, "Listo": 1 };
 
+/* Modo de aplicacion de una actividad: apartamento (UNIDAD), todo el nivel
+   (NIVEL, actividades especiales) o zona fija en cada nivel (ZONA). */
+const MODOS_APP = ["UNIDAD", "NIVEL", "ZONA"];
+function aplicacionDe(act) {
+  const v = String(act?.APLICACION || "").toUpperCase();
+  return MODOS_APP.includes(v) ? v : "UNIDAD";
+}
+function zonaDe(act) {
+  return String(act?.ZONA || "").replace(/\|/g, " ").trim().toUpperCase() || "PUNTO FIJO";
+}
+
 /* estilos de toasts + skeletons + empty states */
 (function () {
   if (document.getElementById("ac-fx")) return;
