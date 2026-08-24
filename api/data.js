@@ -98,15 +98,33 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
   const valFila = (r) => valOf(r.ACTIVIDAD, r.NIVEL, r.UNIDAD);
   const habilitadas = cfgRows.filter((r) => String(r.PROYECTO || "") === String(proyecto) && habilitado(r));
 
+  // Avance general: cada actividad aporta SU PROMEDIO entre las filas donde
+  // esta habilitada (mismas matematicas que el dashboard). Sin ese promedio,
+  // habilitar una actividad en muchos niveles multiplicaria su peso.
+  const filasPorAct = new Map();
+  for (const r of habilitadas) {
+    const k = String(r.ACTIVIDAD);
+    if (!filasPorAct.has(k)) filasPorAct.set(k, []);
+    filasPorAct.get(k).push(r);
+  }
+
   let general = 0;
   const porNivel = {};
   const porUnidad = {};
+  for (const [actId, filas] of filasPorAct) {
+    const info = actInfo.get(actId);
+    if (!info) continue;
+    const pond = num(info.PONDERACION) * (capPond.get(String(info.CAPITULO)) ?? 0);
+    const promedio = filas.reduce((s, r) => s + valFila(r), 0) / filas.length;
+    general += promedio * pond;
+  }
+  // Detalle por nivel y por unidad: acumulan ponderacion fila a fila y se
+  // normalizan solas al dividir (cada nivel/unidad compara sus propias filas).
   for (const r of habilitadas) {
     const info = actInfo.get(String(r.ACTIVIDAD));
     if (!info) continue;
     const pond = num(info.PONDERACION) * (capPond.get(String(info.CAPITULO)) ?? 0);
     const v = valFila(r) * pond;
-    general += v;
     const nk = String(r.NIVEL);
     (porNivel[nk] ||= { suma: 0, pond: 0 });
     porNivel[nk].suma += v;

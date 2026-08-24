@@ -88,11 +88,11 @@ const registroAv = [
   { FECHA: "2026-08-23T10:00Z", PROYECTO: "P", ACTIVIDAD: "ACT03", NIVEL: "3", UNIDAD: "NIVEL", ESTADO: "Manual", VALOR: "0.65" }
 ];
 const av = calcularAvance(cfgAv, actsAv, caps, registroAv, "P", unidadesAv);
-// Esperado (cada fila de configuracion pesa su actividad x capitulo):
-//   ACT01: (1*.3) + (.5*.3) = .45 ; ACT02: 1*.2 = .2 ; ACT03: .65*.5 = .325
-assert(cerca(av.general, 97.5), `avance general 97.5% (dio ${av.general.toFixed(2)}%)`);
+// Esperado (cada actividad aporta su promedio entre filas habilitadas):
+//   ACT01 promedio (.75) *.6*.5 = .225 ; ACT02: 1*.2 = .2 ; ACT03: .65*.5 = .325
+assert(cerca(av.general, 75.0), `avance general 75% (dio ${av.general.toFixed(2)}%)`);
 const n2 = av.niveles.find((x) => x.n === "2"), n3 = av.niveles.find((x) => x.n === "3");
-assert(n2 && cerca(n2.pct, (.45 + .2) / .8 * 100), `nivel 2 ponderado (dio ${n2 ? n2.pct.toFixed(1) : "?"}%)`);
+assert(n2 && cerca(n2.pct, (.3 + .15 + .2) / .8 * 100), `nivel 2 ponderado (dio ${n2 ? n2.pct.toFixed(1) : "?"}%)`);
 assert(n3 && cerca(n3.pct, 65), `nivel 3 lee su fila NIVEL directa (dio ${n3 ? n3.pct.toFixed(1) : "?"}%)`);
 const pf = av.unidades.find((u) => u.u === "PUNTO FIJO");
 assert(pf && cerca(pf.pct, 100), "la zona punto fijo aparece como unidad propia al 100%");
@@ -100,6 +100,16 @@ const u201 = av.unidades.find((u) => u.u === "201");
 assert(u201 && cerca(u201.pct, 100), "apartamento 201 al 100%");
 const u301 = av.unidades.find((u) => u.u === "301");
 assert(u301 && cerca(u301.pct, 65), "el nivel especial reparte su avance a cada unidad para la vista por unidad");
+
+// ---------- Regresion: habilitar en muchas filas no multiplica el peso ----------
+const cfgMuchas = [];
+for (let i = 4; i <= 13; i++) cfgMuchas.push(filaCfg("ACT01", i, "201"));
+const regListo = cfgMuchas.map((r, i) => ({
+  FECHA: "2026-08-2" + (i % 8) + "T10:00Z", PROYECTO: "P", ACTIVIDAD: "ACT01",
+  NIVEL: r.NIVEL, UNIDAD: "201", ESTADO: "Listo", VALOR: "1"
+}));
+const av2 = calcularAvance(cfgMuchas, actsAv, caps, regListo, "P", []);
+assert(cerca(av2.general, 30), `10 niveles Listo pesan una sola vez: 30% (dio ${av2.general.toFixed(1)}%)`);
 
 console.log(fallos ? `TESTS ZONA FALLARON (${fallos})` : "TESTS ZONA OK — modos, normalizacion y avance ponderado correctos");
 process.exit(fallos ? 1 : 0);
