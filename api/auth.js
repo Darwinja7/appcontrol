@@ -375,8 +375,14 @@ export default async function handler(req, res) {
         const claves = new Set(actuales.map((r) => r.CODIGO));
         const nuevas = actividadesIn
           .filter((x) => x.codigo && !claves.has(String(x.codigo)))
-          .map((x) => [String(x.codigo), String(x.nombre || x.codigo), String(x.capitulo || ""), String(x.ponderacion ?? ""), "SI",
-            String(x.aplicacion || "UNIDAD").toUpperCase() === "NIVEL" ? "NIVEL" : "UNIDAD"]);
+          .map((x) => {
+            const modo = String(x.aplicacion || "UNIDAD").toUpperCase();
+            const apl = ["UNIDAD", "NIVEL", "ZONA"].includes(modo) ? modo : "UNIDAD";
+            const zona = apl === "ZONA"
+              ? String(x.zona || "PUNTO FIJO").replace(/\|/g, " ").trim().toUpperCase() || "PUNTO FIJO"
+              : "";
+            return [String(x.codigo), String(x.nombre || x.codigo), String(x.capitulo || ""), String(x.ponderacion ?? ""), "SI", apl, zona];
+          });
         if (nuevas.length) await appendRows("ACTIVIDADES", HEADERS.ACTIVIDADES, nuevas);
         agregados.actividades = nuevas.length;
       }

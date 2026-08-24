@@ -1,5 +1,5 @@
 import { readRows, appendRows, replaceRows } from "./_lib/sheets.js";
-import { HEADERS, VALORES, habilitado, UNIDAD_NIVEL } from "./_lib/model.js";
+import { HEADERS, VALORES, habilitado, UNIDAD_NIVEL, MODOS, aplicacionDe, zonaDe, normalizarConfigPorModo } from "./_lib/model.js";
 import { currentUser, esDesarrollador } from "./_lib/session.js";
 import * as XLSX from "xlsx";
 
@@ -29,6 +29,10 @@ function normalizarHoja(nombre, filas) {
     return o;
   });
 }
+
+// Huella de una fila de configuracion para comparar antes/después de la
+// normalizacion sin importar el orden de las claves del objeto.
+const filaCfg = (r) => HEADERS.CONFIGURACION.map((h) => String(r[h] ?? ""));
 
 function diffHoja(actuales, importadas, claveFn) {
   const mapAct = new Map(actuales.map((r) => [claveFn(r), r]));
@@ -67,7 +71,10 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
   const capPond = new Map(capitulos.map((c) => [String(c.CODIGO), num(c.PONDERACION)]));
   const actInfo = new Map(actividades.map((a) => [String(a.CODIGO), a]));
 
-  // Ultimo estado por actividad|nivel|unidad
+  // Ultimo estado por actividad|nivel|unidad. El registro es normal: cada
+  // fila guarda exactamente la clave que se marco (apartamento, zona fija o
+  // el pseudo-valor "NIVEL" de las actividades especiales), asi que la lectura
+  // es directa sin promediar.
   const last = new Map();
   for (const r of registroRows) {
     if (proyecto && String(r.PROYECTO || "") !== String(proyecto)) continue;
@@ -81,8 +88,6 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
   };
   const valOf = (a, n, u) => valDe(last.get(a + "|" + n + "|" + u));
 
-  // Unidades activas por torre|nivel: para filas de configuracion por NIVEL el
-  // valor es el promedio del nivel (todas sus unidades comparten avance).
   const unidadesPorNivel = new Map();
   for (const x of unidadesRows) {
     if (String(x.ACTIVO || "").toUpperCase() !== "SI") continue;
@@ -90,14 +95,7 @@ export function calcularAvance(cfgRows, actividades, capitulos, registroRows, pr
     if (!unidadesPorNivel.has(k)) unidadesPorNivel.set(k, []);
     unidadesPorNivel.get(k).push(String(x.UNIDAD || ""));
   }
-  const valFila = (r) => {
-    if (String(r.UNIDAD) === UNIDAD_NIVEL) {
-      const us = unidadesPorNivel.get(String(r.TORRE || "") + "|" + String(r.NIVEL || "")) || [];
-      if (us.length) return us.reduce((s, un) => s + valOf(r.ACTIVIDAD, r.NIVEL, un), 0) / us.length;
-      return valOf(r.ACTIVIDAD, r.NIVEL, UNIDAD_NIVEL);
-    }
-    return valOf(r.ACTIVIDAD, r.NIVEL, r.UNIDAD);
-  };
+  const valFila = (r) => valOf(r.ACTIVIDAD, r.NIVEL, r.UNIDAD);
   const habilitadas = cfgRows.filter((r) => String(r.PROYECTO || "") === String(proyecto) && habilitado(r));
 
   let general = 0;
@@ -219,7 +217,6 @@ export default async function handler(req, res) {
     const map = new Map(cfg.map((r) => [[r.TORRE, r.ACTIVIDAD, r.NIVEL, r.UNIDAD].join("|"), r]));
     const fecha = new Date().toISOString();
     const rows = [];
-    let unidadesCache = null;
     for (const it of items) {
       // El proyecto SIEMPRE viene del token, nunca del cliente.
       // Dos modos: estado del catalogo o porcentaje manual 0-100.
@@ -234,25 +231,14 @@ export default async function handler(req, res) {
         estado = it.estado;
         valor = String(VALORES[it.estado] ?? 0);
       }
-      // Actividad por NIVEL: se valida contra su fila de configuracion
-      // ("NIVEL") pero se registra una fila por unidad activa del nivel —
-      // todas heredan el mismo avance. Sin unidades aun, cae como fila NIVEL.
-      let destinos = [it.unidad];
-      if (String(it.unidad) === UNIDAD_NIVEL) {
-        if (!unidadesCache) unidadesCache = await readRows("UNIDADES");
-        const delNivel = unidadesCache.filter((x) =>
-          String(x.PROYECTO || "") === u.PROYECTO && x.TORRE === it.torre &&
-          String(x.NIVEL || "") === String(it.nivel) && String(x.ACTIVO || "").toUpperCase() === "SI"
-        ).map((x) => x.UNIDAD);
-        if (delNivel.length) destinos = delNivel;
-      }
-      for (const destino of destinos) {
-        const row = map.get([it.torre, it.actividad, it.nivel, UNIDAD_NIVEL].join("|")) ||
-          map.get([it.torre, it.actividad, it.nivel, it.unidad].join("|"));
-        if (!row || !habilitado(row)) continue;
-        rows.push([fecha, u.PROYECTO, it.torre, row.CAPITULO, it.actividad, String(it.nivel), destino,
-          estado, valor, row.CONTRATISTA, u.SENDER_ID || u.EMAIL]);
-      }
+      // Registro normal: una fila con la clave exacta que llego (apartamento,
+      // zona fija o "NIVEL"). Se valida contra su fila de configuracion,
+      // aceptando la fila especial del nivel como alternativa.
+      const row = map.get([it.torre, it.actividad, it.nivel, UNIDAD_NIVEL].join("|")) ||
+        map.get([it.torre, it.actividad, it.nivel, String(it.unidad ?? "")].join("|"));
+      if (!row || !habilitado(row)) continue;
+      rows.push([fecha, u.PROYECTO, it.torre, row.CAPITULO, it.actividad, String(it.nivel), String(it.unidad ?? ""),
+        estado, valor, row.CONTRATISTA, u.SENDER_ID || u.EMAIL]);
     }
       if (rows.length) {
         await appendRows("REGISTRO", HEADERS.REGISTRO, rows);
@@ -267,6 +253,42 @@ export default async function handler(req, res) {
         .filter((h) => String(h.PROYECTO || "") === String(u.PROYECTO || ""))
         .map((h) => ({ fecha: h.FECHA, ambito: h.AMBITO, avance: num(h.AVANCE) }));
       return res.json({ success: true, puntos });
+    }
+
+    // Modo de aplicacion de las actividades: apartamento, nivel completo o
+    // zona fija. Al cambiar el modo se normaliza CONFIGURACION (colapso de
+    // filas por apartamento en una fila por nivel) conservando contratista.
+    if (a === "actividades-save") {
+      if (String(u.ROL).toUpperCase() !== "ADMIN") return res.status(403).json({ success: false, codigo: "SOLO_ADMIN" });
+      const cambios = Array.isArray((req.body || {}).cambios) ? req.body.cambios : [];
+      if (!cambios.length) return res.status(400).json({ success: false, codigo: "DATOS_INCOMPLETOS" });
+      const acts = await readRows("ACTIVIDADES");
+      let actualizadas = 0;
+      for (const c of cambios) {
+        const act = acts.find((x) => String(x.CODIGO) === String(c.codigo || ""));
+        if (!act) continue;
+        const modo = String(c.aplicacion || "").toUpperCase();
+        if (!MODOS.includes(modo)) continue;
+        const zonaNueva = String(c.zona || "").replace(/\|/g, " ").trim().toUpperCase() || "PUNTO FIJO";
+        const sinCambio = aplicacionDe(act) === modo && (modo !== "ZONA" || zonaDe(act) === zonaNueva);
+        if (sinCambio) continue;
+        act.APLICACION = modo;
+        act.ZONA = modo === "ZONA" ? zonaNueva : "";
+        actualizadas++;
+      }
+      let filasConfig = null;
+      if (actualizadas) {
+        await replaceRows("ACTIVIDADES", HEADERS.ACTIVIDADES,
+          acts.map((r) => HEADERS.ACTIVIDADES.map((h) => r[h] ?? "")), acts.length);
+        const cfgActual = await readRows("CONFIGURACION");
+        const normalizada = normalizarConfigPorModo(cfgActual, acts);
+        if (JSON.stringify(normalizada.map(filaCfg)) !== JSON.stringify(cfgActual.map(filaCfg))) {
+          await replaceRows("CONFIGURACION", HEADERS.CONFIGURACION,
+            normalizada.map((r) => HEADERS.CONFIGURACION.map((h) => r[h] ?? "")), cfgActual.length);
+          filasConfig = normalizada.length;
+        }
+      }
+      return res.json({ success: true, actualizadas, filasConfig });
     }
 
     // ===== MAESTRO: exportar / previsualizar / importar =====
