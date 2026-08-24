@@ -48,6 +48,12 @@ upsert("ACT003", "Escaleras", "CAP01", null, "ZONA", ZONA_PF);
 upsert("ACT005", "Ascensor", "CAP01", null, "ZONA", ZONA_PF);
 upsert("ACT006", "Barandas metalicas", "CAP03", null, "ZONA", ZONA_PF);
 upsert("ACT007", "Puertas cortafuego", "CAP04", null, "ZONA", ZONA_PF);
+// El resto vuelve al modo normal (por apartamento) sin zona.
+for (const a of acts) {
+  if (!["ACT001", "ACT003", "ACT004", "ACT005", "ACT006", "ACT007"].includes(a.CODIGO)) {
+    a.APLICACION = "UNIDAD"; a.ZONA = "";
+  }
+}
 
 // Rebalanceo: la actividad nueva entra con su peso y las demas se escalan
 // para que el capitulo siga sumando 1.0 (con correccion de redondeo).
@@ -114,7 +120,9 @@ for (const n of rango(4, 5)) for (const u of unidades.filter((x) => x.TIPO === "
 for (const u of zonasComunes) cfgNuevas.push(filaCfg("ACT090", u.NIVEL, u.UNIDAD, "CT03"));
 
 const cfgTodas = await readRows("CONFIGURACION");
-const otras = cfgTodas.filter((r) => !(r.PROYECTO === PROY && r.TORRE === TORRE));
+// El demo se reconstruye completo: se retiran TODAS las filas de P000
+// (ambas torres) para no dejar residuos de configuraciones anteriores.
+const otras = cfgTodas.filter((r) => r.PROYECTO !== PROY);
 await replaceRows("CONFIGURACION", HEADERS.CONFIGURACION,
   [...otras, ...cfgNuevas].map((r) => HEADERS.CONFIGURACION.map((h) => r[h] ?? "")), cfgTodas.length);
 console.log(`   CONFIGURACION: ${cfgTodas.length} -> ${otras.length + cfgNuevas.length} filas (${cfgNuevas.length} nuevas del demo).`);
