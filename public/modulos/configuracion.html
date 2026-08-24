@@ -20,11 +20,13 @@ body::before{display:none}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;align-items:center}
 .actions .btn{width:auto;margin:0;padding:10px 16px;font-size:13px}
 .actions select{width:auto}
+.modos td{padding:7px 10px;border-bottom:1px solid #1B2430;font-size:13px}
+.modos input,.modos select{margin:0;width:auto;min-width:120px;padding:8px;font-size:13px}
 </style>
 </head>
 <body>
 <div class="card" style="margin-top:0">
-  <div class="kicker">Capa de control</div>
+  <div class="kicker">Habilitación</div>
   <h2 style="margin:6px 0 4px;font-size:22px">Base depurada: qué se puede ejecutar</h2>
   <p style="color:var(--mut);font-size:13px">HABILITADO = APLICA Sí + ACTIVO Sí + CONTRATISTA asignado. Solo lo habilitado aparece en el Grid.</p>
   <label>Proyecto</label><select id="proyecto"></select>
@@ -51,8 +53,22 @@ body::before{display:none}
     <input type="file" id="mFile" accept=".xlsx" style="display:none"/>
     <span id="mEstado" style="font-size:12px;color:var(--mut);align-self:center"></span>
   </div>
-  <div class="gridwrap" id="box"></div>
   <div class="msg" id="m"></div>
+</div>
+<div class="card">
+  <div class="kicker">Aplicación de actividades</div>
+  <h2 style="margin:6px 0 4px;font-size:20px">¿Cómo se registra cada actividad?</h2>
+  <p style="color:var(--mut);font-size:13px">Por apartamento (lo normal), por nivel completo (especiales como la losa) o en una zona fija que se repite en todos los niveles, como el punto fijo de escaleras, ascensor, barandas y puertas cortafuego. Si cambias el modo, la configuración existente se ajusta sola.</p>
+  <div class="gridwrap"><table class="modos grid" id="modosBox"></table></div>
+  <div class="actions">
+    <button class="btn" id="saveModos">Guardar aplicación</button>
+    <span id="modosMsg" style="font-size:12px;color:var(--mut);align-self:center"></span>
+  </div>
+</div>
+<div class="card">
+  <div class="kicker">Capa de control por celda</div>
+  <p style="color:var(--mut);font-size:13px">Elige proyecto, torre y actividad y marca celda por celda dónde aplica.</p>
+  <div class="gridwrap" id="box"></div>
 </div>
 <script src="/js/app.js"></script>
 <script>
@@ -70,6 +86,27 @@ async function init() {
   $("#proyecto").onchange = () => { fill($("#torre"), torres(), (t) => ({ v: t, t })); reset(); };
   $("#torre").onchange = () => { fill($("#actividad"), D.actividades, (a) => ({ v: a.CODIGO, t: a.CODIGO + " - " + a.NOMBRE })); reset(); };
   $("#actividad").onchange = render;
+  renderModos();
+  $("#saveModos").onclick = async () => {
+    const cambios = [...$("#modosBox").querySelectorAll(".modoSel")].map((s) => {
+      const inp = [...$("#modosBox").querySelectorAll(".zonaInp")].find((i) => i.dataset.cod === s.dataset.cod);
+      return { codigo: s.dataset.cod, aplicacion: s.value, zona: inp ? inp.value : "" };
+    });
+    const btn = $("#saveModos"); btn.disabled = true; btn.textContent = "...";
+    const d = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"actividades-save", cambios }) });
+    btn.disabled = false; btn.textContent = "Guardar aplicación";
+    const msg = $("#modosMsg");
+    msg.style.color = d.success ? "" : "#EF4444";
+    if (d.success) {
+      msg.textContent = d.actualizadas
+        ? "Guardado (" + d.actualizadas + " actividad(es)" + (d.filasConfig ? ", configuración reajustada: " + d.filasConfig + " filas" : "") + ")."
+        : "Sin cambios por guardar.";
+      D = await api("/api/data", { method:"POST", body: JSON.stringify({ action:"catalogos" }) });
+      CFG = D.configuracion.map((r) => ({ ...r }));
+      renderModos();
+      render();
+    } else msg.textContent = traducirError(d.codigo);
+  };
   $("#aSi").onclick = () => bulk((r) => { r.APLICA = "SI"; });
   $("#aNo").onclick = () => bulk((r) => { r.APLICA = "NO"; });
   $("#vSi").onclick = () => bulk((r) => { r.ACTIVO = "SI"; if (!r.FECHA_ACTIVACION) r.FECHA_ACTIVACION = hoy(); r.FECHA_DESACTIVACION = ""; });
@@ -130,7 +167,8 @@ function torres() {
   ])];
 }
 const actInfo = (a) => D.actividades.find((x) => x.CODIGO === a);
-const esPorNivel = (a) => (String(actInfo(a)?.APLICACION || "").toUpperCase() === "NIVEL");
+const modoDe = (a) => aplicacionDe(actInfo(a));
+const zonaDeAct = (a) => zonaDe(actInfo(a));
 function nivelesDeTorre(t) {
   const p = $("#proyecto").value;
   return [...new Set([
@@ -148,7 +186,8 @@ function bulk(fn) { sel.forEach((k) => { const [t, a, n, u] = k.split("|"); fn(g
 function render() {
   const t = $("#torre").value, a = $("#actividad").value;
   if (!t || !a) return;
-  if (esPorNivel(a)) return renderPorNivel(t, a);
+  const modo = modoDe(a);
+  if (modo !== "UNIDAD") return renderPorNiveles(t, a, modo === "ZONA" ? zonaDeAct(a) : "NIVEL", modo === "ZONA" ? zonaDeAct(a) : "Todo el nivel");
   const units = D.unidades.filter((u) => u.PROYECTO === $("#proyecto").value && u.TORRE === t && u.ACTIVO === "SI");
   const niveles = [...new Set(units.map((u) => u.NIVEL))].sort((x, y) => +x - +y);
   const cols = [...new Set(units.map((u) => u.UNIDAD))].sort();
@@ -167,15 +206,41 @@ function render() {
   wireCeldas();
 }
 
-function renderPorNivel(t, a) {
+/* Actividades especiales (por nivel) o de zona fija: una columna por nivel.
+   La zona fija vive en todos los niveles; el nivel completo usa "NIVEL". */
+function renderPorNiveles(t, a, destino, tituloCol) {
   const niveles = nivelesDeTorre(t);
-  let html = "<table class='grid'><tr><th>NIVEL</th><th>Estado</th></tr>";
+  let html = "<table class='grid'><tr><th>NIVEL</th><th>" + esc(tituloCol) + "</th></tr>";
   for (const n of niveles) {
-    html += `<tr><td class='lvl'>${esc(n)}</td>` + celdaConfig(t, a, n, "NIVEL") + "</tr>";
+    html += `<tr><td class='lvl'>${esc(n)}</td>` + celdaConfig(t, a, n, destino) + "</tr>";
   }
   html += "</table>";
   $("#box").innerHTML = html;
   wireCeldas();
+}
+
+function renderModos() {
+  const filas = D.actividades.map((a) => {
+    const m = aplicacionDe(a);
+    return `<tr>
+      <td style="color:var(--mut)">${esc(a.CODIGO)}</td>
+      <td><b>${esc(a.NOMBRE)}</b></td>
+      <td><select class="modoSel" data-cod="${esc(a.CODIGO)}">
+        <option value="UNIDAD"${m === "UNIDAD" ? " selected" : ""}>Por apartamento</option>
+        <option value="NIVEL"${m === "NIVEL" ? " selected" : ""}>Todo el nivel (especial)</option>
+        <option value="ZONA"${m === "ZONA" ? " selected" : ""}>Zona fija por nivel</option>
+      </select></td>
+      <td><input class="zonaInp" data-cod="${esc(a.CODIGO)}" value="${esc(zonaDe(a))}" placeholder="PUNTO FIJO"${m === "ZONA" ? "" : " disabled"}/></td>
+    </tr>`;
+  }).join("");
+  $("#modosBox").innerHTML = "<tr><th>Código</th><th>Actividad</th><th>Se registra</th><th>Zona fija</th></tr>" + filas;
+  const zonaInpDe = (cod) => [...$("#modosBox").querySelectorAll(".zonaInp")].find((i) => i.dataset.cod === cod);
+  $("#modosBox").querySelectorAll(".modoSel").forEach((s) => s.onchange = () => {
+    const inp = zonaInpDe(s.dataset.cod);
+    if (!inp) return;
+    inp.disabled = s.value !== "ZONA";
+    if (s.value === "ZONA" && !inp.value.trim()) inp.value = "PUNTO FIJO";
+  });
 }
 
 function celdaConfig(t, a, n, u) {

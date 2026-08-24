@@ -120,13 +120,10 @@ function valOf(a, n, u) {
 }
 function actAvance(a, rows) {
   if (!rows.length) return 0;
+  // Registro normal: cada fila de configuracion lee su clave exacta
+  // (apartamento, zona fija o "NIVEL" en actividades especiales).
   let suma = 0;
-  for (const r of rows) {
-    if (String(r.UNIDAD) === "NIVEL") {
-      const us = D.unidades.filter((x) => x.PROYECTO === $("#proyecto").value && x.TORRE === r.TORRE && String(x.NIVEL) === String(r.NIVEL) && String(x.ACTIVO).toUpperCase() === "SI");
-      suma += us.length ? us.reduce((s, x) => s + valOf(a, r.NIVEL, x.UNIDAD), 0) / us.length : valOf(a, r.NIVEL, "NIVEL");
-    } else suma += valOf(a, r.NIVEL, r.UNIDAD);
-  }
+  for (const r of rows) suma += valOf(a, r.NIVEL, r.UNIDAD);
   return suma / rows.length;
 }
 /* Avance por nivel: cada actividad pesa su ponderacion x la de su capitulo */
