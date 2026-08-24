@@ -1,21 +1,24 @@
-// Crea un usuario temporal de prueba para validar el flujo de recuperacion.
+// Crea un usuario temporal de prueba para validar flujos en produccion.
 //
-//   node scripts/crear-usuario-prueba.mjs <correo> [nombre]
+//   node scripts/crear-usuario-prueba.mjs <correo> [nombre] [rol] [torre]
 //
-// Inserta en USUARIOS: RESIDENTE de E001/P000, torre T2, MUST_CHANGE_PASSWORD=NO.
-// Idempotente: si el correo ya existe, no hace nada. La contrasena inicial se
-// muestra UNA vez (luego se cambia por el flujo del PIN).
+// Inserta en USUARIOS de E001/P000 (por defecto RESIDENTE, torre T2,
+// MUST_CHANGE_PASSWORD=NO). Con rol ADMIN usa torre * (todas).
+// Idempotente: si el correo ya existe, no hace nada. La contrasena inicial
+// se muestra UNA vez.
 import { readRows, replaceRows } from "../api/_lib/sheets.js";
 import { HEADERS } from "../api/_lib/model.js";
 import { hashPassword, passwordTemporal } from "../api/_lib/auth.js";
 
-const EMPRESA = "E001", PROYECTO = "P000", TORRE = "T2", ROL = "RESIDENTE";
+const EMPRESA = "E001", PROYECTO = "P000";
 
-const [emailArg, nombreArg] = process.argv.slice(2);
+const [emailArg, nombreArg, rolArg, torreArg] = process.argv.slice(2);
 if (!emailArg || !emailArg.includes("@")) {
-  console.error("Uso: node scripts/crear-usuario-prueba.mjs <correo> [nombre]");
+  console.error("Uso: node scripts/crear-usuario-prueba.mjs <correo> [nombre] [rol=RESIDENTE|ADMIN|VISUALIZADOR] [torre=T2|*]");
   process.exit(1);
 }
+const ROL = ["ADMIN", "RESIDENTE", "VISUALIZADOR"].includes(String(rolArg || "").toUpperCase()) ? String(rolArg).toUpperCase() : "RESIDENTE";
+const TORRE = ROL === "ADMIN" ? (torreArg || "*") : (torreArg || "T2");
 if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || !process.env.SPREADSHEET_ID) {
   console.error("Faltan GOOGLE_SERVICE_ACCOUNT_JSON o SPREADSHEET_ID en el entorno.");
   process.exit(1);
