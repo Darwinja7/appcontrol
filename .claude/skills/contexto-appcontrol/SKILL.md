@@ -114,22 +114,17 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
 
 ## Pendientes / siguientes pasos
 
-1. **Configurar RESEND_API_KEY + MAIL_FROM en Vercel** (el usuario aun no lo hace;
-   /api/health reporta mailConfigurado:false) y probar el correo real del PIN:
-   agregar variables -> redeploy (puede ser commit vacio) -> health debe dar
-   mailConfigurado:true -> forgot-start desde la UI con
-   darwingranadosjimenez@gmail.com -> confirmar llegada del correo -> cambiar
-   contrasena con el PIN. Nota: sin dominio verificado en Resend,
-   onboarding@resend.dev solo envia al dueno de la cuenta de Resend; para otros
-   admins habra que verificar dominio.
+1. ~~Configurar RESEND_API_KEY + MAIL_FROM en Vercel y probar el correo real del
+   PIN~~ **RESUELTO 2026-08-23**: variables configuradas, redeploy d6adb15,
+   health mailConfigurado:true, flujo E2E completo PASS (ver sesion v1.9.3).
 2. Prueba fisica de dictado por voz en Chrome Android (en escritorio ya verificada)
 3. Borrar de USUARIOS la fila inactiva prueba.residente@test.com si molesta
 4. Roadmap del README: cronograma programado vs ejecutado, costos/fiduciaria,
    entregas y postventa, adapter Supabase
 5. CSP actual permite 'unsafe-inline' en scripts (los modulos usan <script> inline);
    migrarlos a /js/*.js para CSP estricta
-6. **DESARROLLO EN PAUSA** (decision del usuario 2026-08-23): la app queda
-   funcional en v1.9.2; retomar con los items de este roadmap cuando se reinicie
+6. **DESARROLLO EN PAUSA** (decision del usuario): la app queda funcional;
+   retomar con los items de este roadmap cuando se reinicie
 
 ## Convenciones
 
@@ -193,3 +188,24 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
   transitorio en maestro-import tras rafagas — esperar 60-75 s y reintentar.
 - Estado final: v1.9.2 desplegada y funcional. Unico pendiente bloqueante: llaves de
   Resend en Vercel para el correo real del PIN (pendiente 1 de esta memoria).
+
+## Cierre E2E del correo del PIN (v1.9.3, 2026-08-23)
+
+- El usuario configuro RESEND_API_KEY + MAIL_FROM (onboarding@resend.dev, su gmail
+  es dueno de la cuenta Resend) -> redeploy con commit vacio d6adb15 ->
+  health mailConfigurado:true.
+- Flujo completo probado en la UI real, TODO PASS:
+  1. Usuario temporal creado por script: qa.pin@pruebaappcontrol.com (U0002,
+     RESIDENTE E001/P000/T2) via scripts/crear-usuario-prueba.mjs.
+  2. forgot-start desde /login (panel Olvide mi contrasena): mensaje correcto
+     "Solicitud enviada. Comuniquese con el administrador..." + cuenta regresiva 15:00.
+  3. Correo REAL recibido en el Gmail del admin (asunto "PIN de recuperacion
+     AppControl - E001/P000", plantilla para admin con solicitante y vencimiento).
+  4. forgot-confirm desde la UI con el PIN del correo -> "Contrasena cambiada".
+  5. Login con las credenciales nuevas -> entro a /app.html sin cambio forzado.
+- Limpieza verificada: fila temporal eliminada; USUARIOS queda solo con
+  darwingranadosjimenez@gmail.com (ADMIN E001/P000). test-forgot.mjs TODO EN VERDE
+  con mailConfigurado:true.
+- Nota operativa: /login redirige a /app.html si hay sesion valida — para probar el
+  panel de recuperacion hay que cerrar sesion primero (btn-logout del shell).
+- Pendiente restante del flujo: nada. Solo voz fisica en Android (pendiente 2).
