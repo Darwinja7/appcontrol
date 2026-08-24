@@ -43,7 +43,9 @@ actividad -> capitulo -> proyecto. Todo sobre Google Sheets como base de datos.
   con iframes), modulos/ (registro, dashboard, configuracion, usuarios), js/app.js
 - `scripts/` â€” init-db.mjs (estructura), seed.mjs (datos demo), reset-password.mjs,
   generar-db-base.mjs (genera config/appcontrol-db-base.xlsx), backfill-historico.mjs,
-  smoke.mjs (pruebas contra deploy)
+  smoke.mjs (pruebas contra deploy), test-forgot.mjs (flujo recuperacion),
+  proteger-password-hash.mjs (protege columna PASSWORD_HASH), leer-contratistas.mjs
+  (diagnostico directo de hoja), maestro-variante.mjs (XLSX de prueba para import)
 - Hoja de calculo: 11 pestaÃ±as â€” LEEME, EMPRESAS, PROYECTOS, USUARIOS, CAPITULOS,
   ACTIVIDADES, NIVELES, UNIDADES, CONTRATISTAS, CONFIGURACION, REGISTRO, HISTORICO
 
@@ -112,14 +114,22 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
 
 ## Pendientes / siguientes pasos
 
-1. Verificar que el usuario configuro RESEND_API_KEY + MAIL_FROM en Vercel (no en
-   blanco) y probar el flujo "Olvide mi contrasena" de punta a punta
-2. El usuario debe proteger la columna PASSWORD_HASH en Sheets (Datos > Proteger rango)
+1. **Configurar RESEND_API_KEY + MAIL_FROM en Vercel** (el usuario aun no lo hace;
+   /api/health reporta mailConfigurado:false) y probar el correo real del PIN:
+   agregar variables -> redeploy (puede ser commit vacio) -> health debe dar
+   mailConfigurado:true -> forgot-start desde la UI con
+   darwingranadosjimenez@gmail.com -> confirmar llegada del correo -> cambiar
+   contrasena con el PIN. Nota: sin dominio verificado en Resend,
+   onboarding@resend.dev solo envia al dueno de la cuenta de Resend; para otros
+   admins habra que verificar dominio.
+2. Prueba fisica de dictado por voz en Chrome Android (en escritorio ya verificada)
 3. Borrar de USUARIOS la fila inactiva prueba.residente@test.com si molesta
 4. Roadmap del README: cronograma programado vs ejecutado, costos/fiduciaria,
    entregas y postventa, adapter Supabase
 5. CSP actual permite 'unsafe-inline' en scripts (los modulos usan <script> inline);
    migrarlos a /js/*.js para CSP estricta
+6. **DESARROLLO EN PAUSA** (decision del usuario 2026-08-23): la app queda
+   funcional en v1.9.2; retomar con los items de este roadmap cuando se reinicie
 
 ## Convenciones
 
@@ -150,3 +160,36 @@ rafagas de escrituras/lecturas simultaneas â€” la cuota de Sheets puede vac
 - QA: cuenta qa.matrix y fila LLM_CONFIG eliminadas tras las pruebas; quedan registros demo Listo en REGISTRO (T2 niv4-5 ACT010/011) como data de ejemplo.
 - Nueva skill compartida: agente-conversacional-modulos (en darwin-dotfiles, junction a ~/.claude/skills) — patron BYOK reutilizable.
 - Pendiente: verificacion visual browser-harness (tap cicla colores, voz en Chrome Android) y prueba de import maestro desde la UI.
+
+## Cierre del loop v1.9.2 (2026-08-23) — desarrollo pausado aqui
+
+- Punto 3 (PIN al admin): forgot-start ahora envia el PIN por correo a TODOS los
+  ADMIN activos del proyecto via Resend (sendResetPin en mail.js, plantilla
+  redactada para el admin con solicitante/empresa/proyecto y vencimiento 15 min).
+  Respuesta al solicitante siempre generica (anti-enumeracion); reset-pins queda
+  como respaldo visual; login.html dice "Comuniquese con el administrador".
+  /api/health expone mailConfigurado (booleano). test-forgot.mjs TODO EN VERDE.
+- Punto 4 (PASSWORD_HASH protegida): scripts/proteger-password-hash.mjs creo el
+  rango protegido USUARIOS!I:I (warningOnly:false, solo la service account escribe).
+  Verificado: la API sigue escribiendo USUARIOS sin error (forgot-start lo ejercita).
+- BUG CRITICO encontrado por la verificacion visual (punto 1): el tap en registro
+  NO ciclaba estados — la celda era un <label> y el navegador reenvia el clic al
+  boton ✓ interno (activacion nativa de labels); ciclar + done se anulaban mutuamente.
+  Fix b696462: celda ahora es <div class='cell'> (CSS + template + wireCeldas).
+  Re-test completo en produccion: ciclo de 5 taps perfecto Listo->Sin empezar->
+  ...->Listo, long-press selecciona/deselecciona, % manual MAN 65% OK, boton
+  realizado OK, Deshacer OK. Los cambios quedan en memoria hasta Guardar (no se
+  guardo nada durante las pruebas).
+- Punto 2 (import maestro desde UI): export descargo XLSX real (75 KB); preview
+  diff idempotente (224 filas iguales, 0 cambios en 8 hojas); cancelar OK;
+  aplicar OK con escritura real probada via roundtrip C999 (+1 nuevo -> "1 hoja
+  actualizada"; restauracion -1 eliminado). data.js omite hojas sin diff ("0 hojas"
+  con archivo identico es comportamiento correcto, linea ~309).
+- Tecnicas browser-harness aprendidas: iframes same-origin NO aparecen como targets
+  (usar contentDocument desde el top page); CSP bloquea eval() pero permite inyectar
+  <script> inline para instrumentar confirm()/prompt() del iframe; pasar archivos al
+  input #mFile via DataTransfer en fragmentos base64 de 30 KB (mensaje CDP tiene
+  limite); la cuota de Sheets (429 read requests per minute) provoca ERROR_INTERNO
+  transitorio en maestro-import tras rafagas — esperar 60-75 s y reintentar.
+- Estado final: v1.9.2 desplegada y funcional. Unico pendiente bloqueante: llaves de
+  Resend en Vercel para el correo real del PIN (pendiente 1 de esta memoria).
